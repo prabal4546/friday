@@ -11,7 +11,8 @@ This repository currently holds the infrastructure the app is built on: the Conv
 | `convex/` | Backend: schema, queries, mutations, the Whop checkout action, and HTTP webhooks |
 | `convex/seed.ts` | Deterministic demo world (6 creators, 11 products, 3 live and 2 settled duels) |
 | `convex/melt.test.ts` | Backend tests, run with `pnpm test` |
-| `Melt/` | SwiftUI shell app sources |
+| `Melt/` | SwiftUI app sources |
+| `MeltUITests/` | UI tests that drive the app on a simulator |
 | `project.yml`, `Melt.xcodeproj` | XcodeGen spec and the project it generates (both committed) |
 | `Config/Melt.xcconfig` | The Convex deployment URL the app connects to |
 | `.revyl/config.yaml` | Revyl build recipe for the simulator app |
@@ -62,15 +63,29 @@ pnpm exec convex env set WHOP_WEBHOOK_SECRET
 
 ## iOS app
 
-Requires Xcode with an iOS Simulator runtime. Open `Melt.xcodeproj`, or build from the command line:
+Requires Xcode with an iOS 18 or newer Simulator runtime. The app has three tabs, Arena, Create, and Library, and currently runs on built-in fixtures (`Melt/Fixtures.swift`) that mirror the Convex seed, so it needs no backend and no credentials.
+
+Open `Melt.xcodeproj` in Xcode, pick an iPhone simulator, and press Run. Or from the command line:
 
 ```sh
 xcodebuild -project Melt.xcodeproj -scheme Melt -configuration Debug \
   -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath build ARCHS=arm64
+open -a Simulator    # boot an iPhone from File > Open Simulator if none is running
+xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Melt.app
+xcrun simctl launch booted com.prabaljitwalia.melt
 ```
 
-The app reads `CONVEX_DEPLOYMENT_URL` from `Config/Melt.xcconfig`. In an xcconfig file `//` starts a comment, so the URL is written as `http:/$()/127.0.0.1:3210`.
+To see the empty and failed-to-load states, add `-MeltScenario empty` or `-MeltScenario error` to the end of the launch command.
+
+The UI tests walk the main flow (stake on a duel, open a product preview, generate a design, find it in Library) and both of those states:
+
+```sh
+xcodebuild test -project Melt.xcodeproj -scheme Melt -derivedDataPath build \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
+`Config/Melt.xcconfig` holds `CONVEX_DEPLOYMENT_URL`, the backend the app connects to once it leaves fixtures. In an xcconfig file `//` starts a comment, so the URL is written as `http:/$()/127.0.0.1:3210`.
 
 After editing `project.yml`, regenerate the project with `xcodegen generate` and commit the result.
 
@@ -82,11 +97,12 @@ The Convex hackathon skill in `.agents/skills/convex-hackathon-skill` keeps `hac
 
 ## Revyl
 
+`.revyl/config.yaml` has one `preview` profile that builds the simulator app on Revyl's cloud runners, and turns on Proof of Changes for pull requests. Proof of Changes needs the Revyl GitHub App installed on this repository.
+
 ```sh
 revyl auth login
-revyl app create --name "Melt iOS" --platform ios   # put the ID in build.profiles.development.ios.app_id
-revyl config validate
-revyl build --profile development --platform ios
+revyl build --profile preview --platform ios
+revyl device start --app-id f867bd88-1e8c-447a-bb1a-c5f7744a97cc --open
 ```
 
 Revyl's cloud simulators cannot reach a backend on your machine, so point `Config/Melt.xcconfig` at a cloud Convex deployment before building there.
