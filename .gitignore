@@ -1,0 +1,9 @@
+node_modules/
+.env
+.env.*
+.convex/
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+.DS_Store

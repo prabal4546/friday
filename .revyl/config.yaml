@@ -1,0 +1,12 @@
+project:
+    id: e58c104d-4883-4b63-81fa-a480034befc3
+session:
+    idle_timeout_seconds: 1800
+build:
+    framework: ios
+    profiles:
+        development:
+            ios:
+                build_commands:
+                    - xcodebuild -project 'Melt.xcodeproj' -scheme 'Melt' -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' ARCHS=arm64 -derivedDataPath build
+                output_path: build/Build/Products/Debug-iphonesimulator/*.app

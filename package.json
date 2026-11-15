@@ -1,0 +1,27 @@
+{
+  "name": "melt",
+  "private": true,
+  "scripts": {
+    "dev": "convex dev",
+    "seed": "convex run seed:run",
+    "test": "vitest run",
+    "typecheck": "tsc -p convex --noEmit"
+  },
+  "dependencies": {
+    "convex": "^1.50.0"
+  },
+  "devDependencies": {
+    "@edge-runtime/vm": "^5.0.0",
+    "@types/node": "^26.6.6",
+    "@whop/sdk": "^2.7.0",
+    "convex-test": "^0.0.71",
+    "typescript": "^5.9.0",
+    "vite": "^8.3.8",
+    "vitest": "^5.1.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild"
+    ]
+  }
+}
