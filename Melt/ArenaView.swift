@@ -1,0 +1,185 @@
+import SwiftUI
+
+struct ArenaView: View {
+    @EnvironmentObject private var store: MeltStore
+
+    var body: some View {
+        NavigationStack {
+            PhaseView {
+                List {
+                    if let profile = store.profile {
+                        Section {
+                            LabeledContent("Your credits", value: profile.credits.formatted())
+                        }
+                    }
+                    Section("Live duels") {
+                        if store.liveDuels.isEmpty {
+                            ContentUnavailableView(
+                                "No live duels",
+                                systemImage: "flame",
+                                description: Text("A duel starts when a creator challenges another product.")
+                            )
+                        }
+                        ForEach(store.liveDuels) { duel in
+                            NavigationLink {
+                                DuelDetailView(duelId: duel.id)
+                            } label: {
+                                DuelRow(duel: duel)
+                            }
+                        }
+                    }
+                    if !store.settledDuels.isEmpty {
+                        Section("Settled") {
+                            ForEach(store.settledDuels) { duel in
+                                NavigationLink {
+                                    DuelDetailView(duelId: duel.id)
+                                } label: {
+                                    DuelRow(duel: duel)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Arena")
+        }
+    }
+}
+
+struct DuelRow: View {
+    @EnvironmentObject private var store: MeltStore
+    let duel: Duel
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top) {
+                Text(duel.productA.name)
+                Spacer(minLength: 12)
+                Text(duel.productB.name)
+                    .multilineTextAlignment(.trailing)
+            }
+            .font(.headline)
+            SalesBar(duel: duel)
+            HStack {
+                Text("\(duel.salesA) sold")
+                Spacer()
+                Text("\(duel.salesB) sold")
+            }
+            .font(.subheadline)
+            HStack {
+                Text("\((duel.poolA + duel.poolB).formatted()) credits staked")
+                Spacer()
+                if duel.isLive {
+                    Text("\(duel.endsAt, style: .relative) left")
+                } else if let winner = duel.winner {
+                    Text("\(duel.product(winner).name) won")
+                }
+            }
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            if let stake = store.stake(for: duel.id) {
+                Text(stake.summary(in: duel))
+                    .font(.footnote)
+            }
+        }
+        .padding(.vertical, 4)
+    }
+}
+
+struct SalesBar: View {
+    let duel: Duel
+
+    var body: some View {
+        let total = duel.salesA + duel.salesB
+        let share = total == 0 ? 0.5 : Double(duel.salesA) / Double(total)
+        GeometryReader { proxy in
+            HStack(spacing: 2) {
+                Capsule()
+                    .fill(duel.productA.filament.color)
+                    .frame(width: max(8, proxy.size.width * share - 1))
+                Capsule()
+                    .fill(duel.productB.filament.color)
+            }
+        }
+        .frame(height: 8)
+    }
+}
+
+struct DuelDetailView: View {
+    @EnvironmentObject private var store: MeltStore
+    let duelId: String
+    @State private var side = Side.a
+    @State private var amount = 100
+    @State private var errorMessage: String?
+
+    var body: some View {
+        if let duel = store.duel(id: duelId) {
+            List {
+                Section("Contenders") {
+                    ForEach(Side.allCases, id: \.self) { side in
+                        NavigationLink {
+                            ProductDetailView(productId: duel.product(side).id)
+                        } label: {
+                            ProductRow(product: duel.product(side))
+                        }
+                    }
+                }
+                Section("Your position") {
+                    if let stake = store.stake(for: duel.id) {
+                        Text(stake.summary(in: duel))
+                    } else if duel.isLive {
+                        Picker("Back", selection: $side) {
+                            Text(duel.productA.name).tag(Side.a)
+                            Text(duel.productB.name).tag(Side.b)
+                        }
+                        Picker("Amount", selection: $amount) {
+                            ForEach([50, 100, 250, 500], id: \.self) { credits in
+                                Text("\(credits) credits").tag(credits)
+                            }
+                        }
+                        Button("Stake \(amount) credits") {
+                            Task {
+                                do {
+                                    try await store.placeStake(amount, on: side, duelId: duel.id)
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
+                            }
+                        }
+                    } else {
+                        Text("You didn't back a side in this duel")
+                    }
+                }
+                Section("Sales in this duel") {
+                    SalesBar(duel: duel)
+                    LabeledContent(duel.productA.name, value: "\(duel.salesA) sold")
+                    LabeledContent(duel.productB.name, value: "\(duel.salesB) sold")
+                    if duel.isLive {
+                        LabeledContent("Ends in") {
+                            Text(duel.endsAt, style: .relative)
+                        }
+                    } else if let winner = duel.winner {
+                        LabeledContent("Winner", value: duel.product(winner).name)
+                    }
+                }
+                Section("Prediction pool") {
+                    LabeledContent(duel.productA.name, value: "\(duel.poolA.formatted()) credits")
+                    LabeledContent(duel.productB.name, value: "\(duel.poolB.formatted()) credits")
+                }
+            }
+            .navigationTitle(duel.theme ?? "Duel")
+            .navigationBarTitleDisplayMode(.inline)
+            .errorAlert("Couldn't place your stake", message: $errorMessage)
+        } else {
+            ContentUnavailableView("This duel is gone", systemImage: "questionmark.circle")
+        }
+    }
+}
+
+extension Stake {
+    func summary(in duel: Duel) -> String {
+        let position = "You backed \(duel.product(side).name) with \(amount) credits"
+        guard let payout else { return position }
+        return payout > 0 ? "\(position) and won \(payout)" : "\(position) and lost them"
+    }
+}

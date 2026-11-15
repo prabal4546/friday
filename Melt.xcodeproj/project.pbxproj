@@ -7,21 +7,44 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		137C2779386A32173AF194F1 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1941ADF761A16481052445 /* LibraryView.swift */; };
+		20957F7A5901556AFC760F9F /* Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD46521C0D1A27CD4DA1F91 /* Fixtures.swift */; };
 		226AFEC4A282EF49AC1F3DE7 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6A2276BC304C7B28A3DD62 /* Models.swift */; };
 		2339A8E688E7EF215BAC01FE /* MeltApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD32D1B246A458E06EF96E16 /* MeltApp.swift */; };
-		3625B6307C950DA18C6382C6 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 82E3A4848CDA540C0A52D119 /* ContentView.swift */; };
+		28406E320954D5E1BBC2AB87 /* MeltUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 61B8D9D4E78462E245C871FB /* MeltUITests.swift */; };
+		437826DFB9FD2BE262706D3B /* ArenaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE8D425F8DF7007D05184D9 /* ArenaView.swift */; };
+		587F64517C5CCE1079D487A6 /* CreateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156F6F6EA9813C15ED3B0B00 /* CreateView.swift */; };
 		5EB18A7B8F90CCD8A0BCF75D /* ConvexMobile in Frameworks */ = {isa = PBXBuildFile; productRef = 7C52DCC61AF940D65093FCE4 /* ConvexMobile */; };
 		7EFFD8352EA2031E0D025356 /* MeltStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22A020C73AD248C0932B07A /* MeltStore.swift */; };
+		B808CB7A4F19D651C8F9A89F /* ProductDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1847A78148925F86A4C9BF74 /* ProductDetailView.swift */; };
 		D45D98ADAF6DFAEB8B6AFB57 /* DeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB74C4DD360B5F3EB5A80FDF /* DeviceIdentity.swift */; };
+		DFEB9EAAE8537675CBB82BBF /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D99AD63BFB3B88A989558BCD /* RootView.swift */; };
 /* End PBXBuildFile section */
 
+/* Begin PBXContainerItemProxy section */
+		A04C4A9F82875645AA862A88 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F0C9B96321D18957D83DCCCC /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FE06C22D84C2C76C03DE6B01;
+			remoteInfo = Melt;
+		};
+/* End PBXContainerItemProxy section */
+
 /* Begin PBXFileReference section */
+		0AD46521C0D1A27CD4DA1F91 /* Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fixtures.swift; sourceTree = "<group>"; };
+		1499B8CFB326FC098BE73939 /* MeltUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MeltUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		156F6F6EA9813C15ED3B0B00 /* CreateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateView.swift; sourceTree = "<group>"; };
+		1847A78148925F86A4C9BF74 /* ProductDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductDetailView.swift; sourceTree = "<group>"; };
+		2BE8D425F8DF7007D05184D9 /* ArenaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArenaView.swift; sourceTree = "<group>"; };
 		3E6A2276BC304C7B28A3DD62 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		3EC438FBE65AF88B8AFFB195 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
-		82E3A4848CDA540C0A52D119 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		61B8D9D4E78462E245C871FB /* MeltUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeltUITests.swift; sourceTree = "<group>"; };
 		C22A020C73AD248C0932B07A /* MeltStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeltStore.swift; sourceTree = "<group>"; };
+		CA1941ADF761A16481052445 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		CD32D1B246A458E06EF96E16 /* MeltApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeltApp.swift; sourceTree = "<group>"; };
 		D7A88A192A5962143A1F3A6C /* Melt.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Melt.xcconfig; sourceTree = "<group>"; };
+		D99AD63BFB3B88A989558BCD /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		EAB596305C41B7598B889E95 /* Melt.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Melt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB74C4DD360B5F3EB5A80FDF /* DeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentity.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -41,12 +64,17 @@
 		13C3A2C04FCE37CD63301707 /* Melt */ = {
 			isa = PBXGroup;
 			children = (
-				82E3A4848CDA540C0A52D119 /* ContentView.swift */,
+				2BE8D425F8DF7007D05184D9 /* ArenaView.swift */,
+				156F6F6EA9813C15ED3B0B00 /* CreateView.swift */,
 				FB74C4DD360B5F3EB5A80FDF /* DeviceIdentity.swift */,
+				0AD46521C0D1A27CD4DA1F91 /* Fixtures.swift */,
 				3EC438FBE65AF88B8AFFB195 /* Info.plist */,
+				CA1941ADF761A16481052445 /* LibraryView.swift */,
 				CD32D1B246A458E06EF96E16 /* MeltApp.swift */,
 				C22A020C73AD248C0932B07A /* MeltStore.swift */,
 				3E6A2276BC304C7B28A3DD62 /* Models.swift */,
+				1847A78148925F86A4C9BF74 /* ProductDetailView.swift */,
+				D99AD63BFB3B88A989558BCD /* RootView.swift */,
 			);
 			path = Melt;
 			sourceTree = "<group>";
@@ -55,8 +83,17 @@
 			isa = PBXGroup;
 			children = (
 				EAB596305C41B7598B889E95 /* Melt.app */,
+				1499B8CFB326FC098BE73939 /* MeltUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		2B6743A09AEE33378FADBC6E /* MeltUITests */ = {
+			isa = PBXGroup;
+			children = (
+				61B8D9D4E78462E245C871FB /* MeltUITests.swift */,
+			);
+			path = MeltUITests;
 			sourceTree = "<group>";
 		};
 		3C8D4919B371E0E6FE5C02D7 = {
@@ -64,6 +101,7 @@
 			children = (
 				3E616365C1971FEADB05B32D /* Config */,
 				13C3A2C04FCE37CD63301707 /* Melt */,
+				2B6743A09AEE33378FADBC6E /* MeltUITests */,
 				245BDA6A013E1DF52D4BB4AF /* Products */,
 			);
 			sourceTree = "<group>";
@@ -79,6 +117,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		C85D6DFF4338E655B7A8BCAE /* MeltUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 827AC695C8EA7A1BD1A87757 /* Build configuration list for PBXNativeTarget "MeltUITests" */;
+			buildPhases = (
+				E200F2DA337C7BBA9BC53E46 /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				71FE2C781B8A1CBE46770B3F /* PBXTargetDependency */,
+			);
+			name = MeltUITests;
+			packageProductDependencies = (
+			);
+			productName = MeltUITests;
+			productReference = 1499B8CFB326FC098BE73939 /* MeltUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		FE06C22D84C2C76C03DE6B01 /* Melt */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 276B489885766CA479426F0A /* Build configuration list for PBXNativeTarget "Melt" */;
@@ -107,6 +163,9 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					C85D6DFF4338E655B7A8BCAE = {
+						TestTargetID = FE06C22D84C2C76C03DE6B01;
+					};
 				};
 			};
 			buildConfigurationList = 34DBD176F0A74685901C6FEC /* Build configuration list for PBXProject "Melt" */;
@@ -127,6 +186,7 @@
 			projectRoot = "";
 			targets = (
 				FE06C22D84C2C76C03DE6B01 /* Melt */,
+				C85D6DFF4338E655B7A8BCAE /* MeltUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -136,15 +196,36 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				3625B6307C950DA18C6382C6 /* ContentView.swift in Sources */,
+				437826DFB9FD2BE262706D3B /* ArenaView.swift in Sources */,
+				587F64517C5CCE1079D487A6 /* CreateView.swift in Sources */,
 				D45D98ADAF6DFAEB8B6AFB57 /* DeviceIdentity.swift in Sources */,
+				20957F7A5901556AFC760F9F /* Fixtures.swift in Sources */,
+				137C2779386A32173AF194F1 /* LibraryView.swift in Sources */,
 				2339A8E688E7EF215BAC01FE /* MeltApp.swift in Sources */,
 				7EFFD8352EA2031E0D025356 /* MeltStore.swift in Sources */,
 				226AFEC4A282EF49AC1F3DE7 /* Models.swift in Sources */,
+				B808CB7A4F19D651C8F9A89F /* ProductDetailView.swift in Sources */,
+				DFEB9EAAE8537675CBB82BBF /* RootView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		E200F2DA337C7BBA9BC53E46 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28406E320954D5E1BBC2AB87 /* MeltUITests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		71FE2C781B8A1CBE46770B3F /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FE06C22D84C2C76C03DE6B01 /* Melt */;
+			targetProxy = A04C4A9F82875645AA862A88 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		02B4A53A785B26A31D90DD8D /* Release */ = {
@@ -161,8 +242,7 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.prabaljitwalia.melt;
 				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Release;
 		};
@@ -212,7 +292,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";
@@ -220,6 +300,24 @@
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		5D4E0A6A6E80FB87946EFBE2 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.prabaljitwalia.melt.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Melt;
 			};
 			name = Release;
 		};
@@ -237,8 +335,24 @@
 				MARKETING_VERSION = 0.1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = com.prabaljitwalia.melt;
 				SDKROOT = iphoneos;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = 1;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		B2A3B0FC10D07F917EC233B8 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.prabaljitwalia.melt.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Melt;
 			};
 			name = Debug;
 		};
@@ -294,7 +408,7 @@
 				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
-				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -303,6 +417,7 @@
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -323,6 +438,15 @@
 			buildConfigurations = (
 				BA790AE2B93E701DD38EA8DC /* Debug */,
 				33FE03751DFB19B554D3D004 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		827AC695C8EA7A1BD1A87757 /* Build configuration list for PBXNativeTarget "MeltUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B2A3B0FC10D07F917EC233B8 /* Debug */,
+				5D4E0A6A6E80FB87946EFBE2 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

@@ -1,57 +1,96 @@
-import ConvexMobile
-import Foundation
+import SwiftUI
 
-struct Profile: Decodable {
-    let displayName: String
-    @ConvexFloat var credits: Double
-    @ConvexFloat var wins: Double
-    @ConvexFloat var earningsCents: Double
+enum Side: String, CaseIterable {
+    case a, b
 }
 
-struct ProductSummary: Decodable, Identifiable {
-    let id: String
-    let name: String
-    let creatorName: String
-    @ConvexFloat var priceCents: Double
-    @ConvexFloat var salesCount: Double
+enum Filament: String, CaseIterable, Identifiable {
+    case sky, grape, sunflower, caramel, lava, matcha, bone, tangerine
 
-    enum CodingKeys: String, CodingKey {
-        case id = "_id"
-        case name, creatorName, priceCents, salesCount
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+
+    var color: Color {
+        switch self {
+        case .sky: Color(red: 0.42, green: 0.71, blue: 0.93)
+        case .grape: Color(red: 0.49, green: 0.34, blue: 0.76)
+        case .sunflower: Color(red: 0.97, green: 0.78, blue: 0.22)
+        case .caramel: Color(red: 0.76, green: 0.53, blue: 0.30)
+        case .lava: Color(red: 0.86, green: 0.24, blue: 0.18)
+        case .matcha: Color(red: 0.55, green: 0.71, blue: 0.40)
+        case .bone: Color(red: 0.90, green: 0.86, blue: 0.76)
+        case .tangerine: Color(red: 0.96, green: 0.55, blue: 0.20)
+        }
     }
 }
 
-struct Duel: Decodable, Identifiable {
-    let id: String
-    let productA: ProductSummary
-    let productB: ProductSummary
-    @ConvexFloat var endsAt: Double
-    @ConvexFloat var salesA: Double
-    @ConvexFloat var salesB: Double
-    @ConvexFloat var poolA: Double
-    @ConvexFloat var poolB: Double
+struct Profile: Equatable {
+    var displayName: String
+    var credits: Int
+    var wins: Int
+    var earningsCents: Int
+}
 
-    enum CodingKeys: String, CodingKey {
-        case id = "_id"
-        case productA, productB, endsAt, salesA, salesB, poolA, poolB
+struct Product: Identifiable, Hashable {
+    enum Status: String {
+        case generating, ready, published, failed
+
+        var label: String {
+            switch self {
+            case .generating: "Generating"
+            case .ready: "Draft"
+            case .published: "Published"
+            case .failed: "Failed"
+            }
+        }
+    }
+
+    let id: String
+    var name: String
+    var prompt: String
+    var creatorName: String
+    var isMine: Bool
+    var status: Status
+    var filament: Filament
+    var priceCents: Int
+    var salesCount: Int
+    var printNote: String?
+    var failureReason: String?
+}
+
+struct Duel: Identifiable, Hashable {
+    let id: String
+    var productA: Product
+    var productB: Product
+    var theme: String?
+    var endsAt: Date
+    var isLive: Bool
+    var salesA: Int
+    var salesB: Int
+    var poolA: Int
+    var poolB: Int
+    var winner: Side?
+
+    func product(_ side: Side) -> Product {
+        side == .a ? productA : productB
     }
 }
 
-struct Product: Decodable, Identifiable {
-    let id: String
-    let name: String
-    let status: String
-    let filament: String
-    @ConvexFloat var priceCents: Double
-    @ConvexFloat var salesCount: Double
+struct Stake: Hashable {
+    let duelId: String
+    let side: Side
+    let amount: Int
+    var payout: Int?
+}
 
-    enum CodingKeys: String, CodingKey {
-        case id = "_id"
-        case name, status, filament, priceCents, salesCount
+struct MeltError: LocalizedError {
+    let errorDescription: String?
+
+    init(_ message: String) {
+        errorDescription = message
     }
 }
 
-struct Checkout: Decodable {
-    let orderId: String
-    let purchaseUrl: String
+func dollars(_ cents: Int) -> String {
+    (Decimal(cents) / 100).formatted(.currency(code: "USD"))
 }
