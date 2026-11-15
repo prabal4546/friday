@@ -140,3 +140,29 @@ test("checkout refuses to run without a Whop key and records a failed Whop call"
   const orders = await t.query(api.orders.mine, { deviceId: "phone-2" });
   expect(orders.map((order) => order.status)).toEqual(["failed"]);
 });
+
+test("a new design starts generating and the stand-in turns it into a draft", async () => {
+  vi.useFakeTimers();
+  const { t } = await seeded();
+  const args = { deviceId: "phone-2", prompt: "  A tiny rocket for my desk  ", filament: "lava" };
+  const productId = await t.mutation(api.products.create, args);
+  expect((await t.query(api.products.get, { productId }))!).toMatchObject({
+    status: "generating",
+    name: "A tiny rocket for my desk",
+  });
+  vi.advanceTimersByTime(3001);
+  await t.finishInProgressScheduledFunctions();
+  expect((await t.query(api.products.get, { productId }))!.status).toBe("ready");
+  await expect(t.mutation(api.products.create, { ...args, prompt: "   " })).rejects.toThrow("1 to 400");
+});
+
+test("reset rebuilds the demo world so the seeded profile can be claimed again", async () => {
+  const { t, foxVsDuck } = await seeded();
+  await t.mutation(api.stakes.place, { deviceId: "phone-1", duelId: foxVsDuck._id, side: "a", amount: 100 });
+  expect(await t.mutation(internal.seed.reset, {})).toBe("reset");
+  expect(await t.query(api.profiles.me, { deviceId: "phone-1" })).toBeNull();
+  expect(await t.query(api.duels.live, {})).toHaveLength(3);
+  await t.mutation(api.profiles.ensure, { deviceId: "phone-3", claimSeed: true });
+  expect(await t.query(api.products.mine, { deviceId: "phone-3" })).toHaveLength(6);
+  expect((await t.query(api.profiles.me, { deviceId: "phone-3" }))!.credits).toBe(1250);
+});

@@ -8,6 +8,7 @@ final class MeltUITests: XCTestCase {
     }
 
     func testArenaCreateAndLibraryFlow() {
+        app.launchArguments = ["-MeltScenario", "demo"]
         app.launch()
 
         let foxDuel = element(containing: "Fox desk buddy")
@@ -56,6 +57,39 @@ final class MeltUITests: XCTestCase {
         XCTAssertTrue(element(containing: "Can't load Melt").waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Try again"].exists)
         capture("load-error")
+    }
+
+    func testLiveBackend() throws {
+        guard let url = ProcessInfo.processInfo.environment["MELT_LIVE_URL"] else {
+            throw XCTSkip("Set TEST_RUNNER_MELT_LIVE_URL to a freshly reset Convex deployment to run this test")
+        }
+        app.launchArguments = ["-ConvexDeploymentURL", url]
+        app.launch()
+
+        let hexDuel = element(containing: "Stackable hex bins")
+        XCTAssertTrue(hexDuel.waitForExistence(timeout: 20))
+        capture("live-arena")
+
+        hexDuel.tap()
+        let stakeButton = app.buttons["Stake 100 credits"]
+        XCTAssertTrue(stakeButton.waitForExistence(timeout: 5))
+        stakeButton.tap()
+        XCTAssertTrue(element(containing: "You backed Stackable hex bins with 100 credits").waitForExistence(timeout: 10))
+        capture("live-duel-staked")
+
+        app.tabBars.buttons["Create"].tap()
+        let prompt = app.descendants(matching: .any)["prompt"]
+        XCTAssertTrue(prompt.waitForExistence(timeout: 5))
+        prompt.tap()
+        prompt.typeText("A tiny rocket for my desk")
+        app.buttons["Generate model"].tap()
+        XCTAssertTrue(element(containing: "Generating the model").waitForExistence(timeout: 10))
+        XCTAssertTrue(element(containing: "Draft · $15.00").waitForExistence(timeout: 15))
+
+        app.tabBars.buttons["Library"].tap()
+        XCTAssertTrue(element(containing: "1,150").waitForExistence(timeout: 10))
+        XCTAssertTrue(element(containing: "A tiny rocket for my desk").exists)
+        capture("live-library")
     }
 
     private func element(containing text: String) -> XCUIElement {

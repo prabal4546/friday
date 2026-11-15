@@ -1,15 +1,12 @@
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
-import { internalMutation } from "./_generated/server";
+import { internalMutation, type MutationCtx } from "./_generated/server";
 import { profileByDevice, SEED_DEMO_DEVICE, STARTING_CREDITS } from "./profiles";
 
 const MINUTE = 60 * 1000;
 const HOUR = 60 * MINUTE;
 
-export const run = internalMutation({
-  args: {},
-  handler: async (ctx) => {
-    if ((await profileByDevice(ctx, "seed:priya")) !== null) return "already seeded";
+async function seedWorld(ctx: MutationCtx) {
     const now = Date.now();
 
     const profile = (deviceId: string, displayName: string, wins: number, earningsCents: number) =>
@@ -153,6 +150,24 @@ export const run = internalMutation({
       whopPaymentId: "seed:pay_1042",
       paidAt: now - 20 * HOUR,
     });
+}
+
+export const run = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    if ((await profileByDevice(ctx, "seed:priya")) !== null) return "already seeded";
+    await seedWorld(ctx);
     return "seeded";
+  },
+});
+
+export const reset = internalMutation({
+  args: {},
+  handler: async (ctx) => {
+    for (const table of ["transactions", "orders", "stakes", "duels", "products", "profiles"] as const) {
+      for (const doc of await ctx.db.query(table).take(1000)) await ctx.db.delete(doc._id);
+    }
+    await seedWorld(ctx);
+    return "reset";
   },
 });

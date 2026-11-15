@@ -1,1 +1,1 @@
-CONVEX_DEPLOYMENT_URL = http:/$()/127.0.0.1:3210
+CONVEX_DEPLOYMENT_URL = https:/$()/wry-skunk-692.convex.cloud

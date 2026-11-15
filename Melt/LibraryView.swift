@@ -64,9 +64,10 @@ struct LibraryView: View {
 
 struct ProductRow: View {
     let product: Product
+    var showsCreator = false
 
     private var detail: String {
-        guard product.isMine else { return "\(product.creatorName) · \(dollars(product.priceCents))" }
+        if showsCreator { return "\(product.creatorName) · \(dollars(product.priceCents))" }
         switch product.status {
         case .generating: return "Generating the model"
         case .ready: return "Draft · \(dollars(product.priceCents))"
