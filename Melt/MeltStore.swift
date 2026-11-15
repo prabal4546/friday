@@ -100,6 +100,23 @@ final class MeltStore: ObservableObject {
         }
     }
 
+    func setFilament(_ filament: Filament, productId: String) async throws {
+        if scenario != nil {
+            if let index = products.firstIndex(where: { $0.id == productId }) {
+                products[index].filament = filament
+            }
+            return
+        }
+        do {
+            try await client.mutation(
+                "products:setFilament",
+                with: ["deviceId": deviceId, "productId": productId, "filament": filament.rawValue]
+            )
+        } catch {
+            throw MeltError(Self.message(for: error))
+        }
+    }
+
     private func ensureProfile() async throws {
         let client = client
         let deviceId = deviceId

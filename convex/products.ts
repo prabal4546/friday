@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc } from "./_generated/dataModel";
-import { internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
+import { internalMutation, internalQuery, mutation, query, type QueryCtx } from "./_generated/server";
 import { profileByDevice, requireProfile } from "./profiles";
 
 export async function productSummary(ctx: QueryCtx, product: Doc<"products">) {
@@ -15,6 +15,7 @@ export async function productSummary(ctx: QueryCtx, product: Doc<"products">) {
     filament: product.filament,
     priceCents: product.priceCents,
     thumbnailUrl: product.thumbnailUrl,
+    usdzUrl: product.usdzUrl,
     salesCount: product.salesCount,
     creatorId: product.creatorId,
     creatorName: creator?.displayName ?? "Unknown",
@@ -70,7 +71,11 @@ export const create = mutation({
       printability: "pending",
       salesCount: 0,
     });
-    await ctx.scheduler.runAfter(3000, internal.products.finishStandIn, { productId });
+    if (process.env.FAL_KEY === undefined) {
+      await ctx.scheduler.runAfter(3000, internal.products.finishStandIn, { productId });
+    } else {
+      await ctx.scheduler.runAfter(0, internal.generation.start, { productId });
+    }
     return productId;
   },
 });
@@ -81,5 +86,69 @@ export const finishStandIn = internalMutation({
     const product = await ctx.db.get(args.productId);
     if (product === null || product.status !== "generating") return;
     await ctx.db.patch(product._id, { status: "ready", printability: "ok", printCostCents: 560 });
+  },
+});
+
+export const setFilament = mutation({
+  args: { deviceId: v.string(), productId: v.id("products"), filament: v.string() },
+  handler: async (ctx, args) => {
+    const profile = await requireProfile(ctx, args.deviceId);
+    const product = await ctx.db.get(args.productId);
+    if (product === null || product.creatorId !== profile._id) {
+      throw new ConvexError("Only the creator can change this product");
+    }
+    if (product.status !== "ready") throw new ConvexError("Only a draft can change color");
+    await ctx.db.patch(product._id, { filament: args.filament });
+  },
+});
+
+export const byFalRequest = internalQuery({
+  args: { requestId: v.string() },
+  handler: async (ctx, args) =>
+    await ctx.db
+      .query("products")
+      .withIndex("by_falRequestId", (q) => q.eq("falRequestId", args.requestId))
+      .first(),
+});
+
+export const attachFalRequest = internalMutation({
+  args: {
+    productId: v.id("products"),
+    falRequestId: v.string(),
+    falStatusUrl: v.string(),
+    falResponseUrl: v.string(),
+  },
+  handler: async (ctx, { productId, ...request }) => {
+    await ctx.db.patch(productId, request);
+  },
+});
+
+export const finishGeneration = internalMutation({
+  args: {
+    productId: v.id("products"),
+    usdzUrl: v.string(),
+    stlUrl: v.optional(v.string()),
+    thumbnailUrl: v.optional(v.string()),
+  },
+  handler: async (ctx, { productId, ...files }) => {
+    const product = await ctx.db.get(productId);
+    if (product === null || product.status !== "generating") return;
+    await ctx.db.patch(productId, {
+      ...files,
+      status: "ready",
+      printCostCents: 560,
+      ...(files.stlUrl === undefined
+        ? { printability: "warning" as const, printNote: "The print file could not be prepared from this model" }
+        : { printability: "ok" as const }),
+    });
+  },
+});
+
+export const failGeneration = internalMutation({
+  args: { productId: v.id("products"), reason: v.string() },
+  handler: async (ctx, args) => {
+    const product = await ctx.db.get(args.productId);
+    if (product === null || product.status !== "generating") return;
+    await ctx.db.patch(args.productId, { status: "failed", failureReason: args.reason });
   },
 });

@@ -9,8 +9,10 @@
  */
 
 import type * as duels from "../duels.js";
+import type * as generation from "../generation.js";
 import type * as http from "../http.js";
 import type * as lib_standardWebhooks from "../lib/standardWebhooks.js";
+import type * as lib_stl from "../lib/stl.js";
 import type * as orders from "../orders.js";
 import type * as products from "../products.js";
 import type * as profiles from "../profiles.js";
@@ -26,8 +28,10 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   duels: typeof duels;
+  generation: typeof generation;
   http: typeof http;
   "lib/standardWebhooks": typeof lib_standardWebhooks;
+  "lib/stl": typeof lib_stl;
   orders: typeof orders;
   products: typeof products;
   profiles: typeof profiles;

@@ -31,6 +31,8 @@ export default defineSchema({
     usdzUrl: v.optional(v.string()),
     stlUrl: v.optional(v.string()),
     falRequestId: v.optional(v.string()),
+    falStatusUrl: v.optional(v.string()),
+    falResponseUrl: v.optional(v.string()),
     failureReason: v.optional(v.string()),
     salesCount: v.number(),
   })

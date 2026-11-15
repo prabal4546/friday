@@ -2,13 +2,15 @@
 
 Melt is a native SwiftUI iOS app for the Consumer Mobile Hackathon: describe a product, get a 3D-printable model, sell it through Whop, and duel other creators on sales while everyone else stakes demo credits on the winner.
 
-This repository currently holds the infrastructure the app is built on: the Convex backend, the Whop sandbox payment boundary, an unstyled iOS shell that proves the wiring, and the Revyl build config.
+This repository holds the Convex backend, the SwiftUI app, the Whop sandbox payment boundary, and the Revyl build config. Browsing, staking, and generating a design work today. Publishing to a storefront, checkout from the app, and print fulfillment are not built yet.
 
 ## Layout
 
 | Path | What it is |
 | --- | --- |
 | `convex/` | Backend: schema, queries, mutations, the Whop checkout action, and HTTP webhooks |
+| `convex/generation.ts` | Model generation through fal: queue the job, poll it, keep the USDZ link and an STL |
+| `convex/lib/stl.ts` | Converts fal's OBJ into the binary STL a printer needs |
 | `convex/seed.ts` | Deterministic demo world (6 creators, 11 products, 3 live and 2 settled duels) |
 | `convex/melt.test.ts` | Backend tests, run with `pnpm test` |
 | `Melt/` | SwiftUI app sources |
@@ -53,14 +55,27 @@ These live on the Convex deployment only. They never go in the repository or the
 
 | Name | Purpose |
 | --- | --- |
+| `FAL_KEY` | fal API key for model generation. Without it, new designs get a stand-in shape |
 | `WHOP_API_KEY` | Company API key from the Whop sandbox dashboard, used by `whop:createCheckout` |
 | `WHOP_WEBHOOK_SECRET` | The `ws_...` secret of the webhook that points at this deployment |
 | `WHOP_ENVIRONMENT` | Optional. Anything other than `production` uses the Whop sandbox API |
 
+Each command prompts for the value, so it stays out of your shell history. `pnpm exec convex env list` shows what is set.
+
 ```sh
+pnpm exec convex env set FAL_KEY
 pnpm exec convex env set WHOP_API_KEY
 pnpm exec convex env set WHOP_WEBHOOK_SECRET
 ```
+
+## Model generation
+
+`products:create` adds a design with the status `generating`. What happens next depends on `FAL_KEY`:
+
+- **Key set.** `generation:start` queues the prompt on fal's Meshy 7.1 text-to-3D model (`fal-ai/meshy/v7.1/text-to-3d`, preview mode, about $0.80 a model). fal calls `/webhooks/fal` when the job ends, and a poll every 10 seconds for up to 10 minutes covers a missed callback. The finished design keeps fal's USDZ link for the in-app preview. fal returns no STL, so the OBJ is converted to a binary STL (Z up, longest side 80 mm) and kept in Convex file storage for printing. If the conversion fails the design is still usable and carries a printability warning. A refused, failed, or timed-out job marks the design failed with a reason.
+- **No key.** A scheduled mutation turns the design into a draft after three seconds with no model file, so the whole flow stays usable.
+
+In the app, a design's page downloads the USDZ once, caches it in the app's Caches folder, and shows it on a RealityKit turntable you can drag to orbit, pause, and recolor with the filament picker. When a design has no model, or the file can't be loaded, the turntable shows a stand-in shape and says so.
 
 ## Whop sandbox
 
@@ -89,20 +104,29 @@ Launch arguments, added to the end of the launch command:
 - `-ConvexDeploymentURL http://127.0.0.1:3210` uses the local backend instead of the cloud one.
 - `-MeltScenario demo` runs on built-in fixtures (`Melt/Fixtures.swift`) with no backend at all. `-MeltScenario empty` and `-MeltScenario error` show the empty and failed-to-load states.
 
-The UI tests walk the main flow on fixtures (stake on a duel, open a product preview, generate a design, find it in Library) and both of those states:
+The UI tests walk the main flow on fixtures (stake on a duel, open a product preview, recolor a design, generate a design, find it in Library) and both of those states:
 
 ```sh
 xcodebuild test -project Melt.xcodeproj -scheme Melt -derivedDataPath build \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-To also run the live test, reset the seed and pass the deployment URL. It stakes on a duel and creates a design on that deployment:
+To also run the live test, reset the seed and pass the deployment URL. It stakes on a duel and creates a design on that deployment, which is a real, billed generation when `FAL_KEY` is set:
 
 ```sh
 pnpm exec convex run seed:reset
 TEST_RUNNER_MELT_LIVE_URL=https://wry-skunk-692.convex.cloud xcodebuild test -project Melt.xcodeproj \
   -scheme Melt -derivedDataPath build -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 pnpm exec convex run seed:reset
+```
+
+`testLiveModel` checks a real model in the preview: it opens a ready design from the simulator's Library and fails if the stand-in shape is showing. Generate a design in the app first, wait until it leaves `generating`, and don't reset the seed in between:
+
+```sh
+TEST_RUNNER_MELT_LIVE_URL=https://wry-skunk-692.convex.cloud TEST_RUNNER_MELT_LIVE_MODEL="A tiny rocket" \
+  xcodebuild test -project Melt.xcodeproj -scheme Melt -derivedDataPath build \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
+  -only-testing:MeltUITests/MeltUITests/testLiveModel
 ```
 
 In an xcconfig file `//` starts a comment, so the URL in `Config/Melt.xcconfig` is written as `https:/$()/wry-skunk-692.convex.cloud`.

@@ -4,6 +4,7 @@ import { convexTest } from "convex-test";
 import { afterEach, expect, test, vi } from "vitest";
 import { api, internal } from "./_generated/api";
 import { signStandardWebhook, verifyStandardWebhook } from "./lib/standardWebhooks";
+import { objToBinaryStl } from "./lib/stl";
 import schema from "./schema";
 
 const modules = import.meta.glob(["./**/*.ts", "./**/*.js", "!./**/*.test.ts", "!./**/*.d.ts"]);
@@ -165,4 +166,77 @@ test("reset rebuilds the demo world so the seeded profile can be claimed again",
   await t.mutation(api.profiles.ensure, { deviceId: "phone-3", claimSeed: true });
   expect(await t.query(api.products.mine, { deviceId: "phone-3" })).toHaveLength(6);
   expect((await t.query(api.profiles.me, { deviceId: "phone-3" }))!.credits).toBe(1250);
+});
+
+const SQUARE_OBJ = "v 0 0 0\nv 2 0 0\nv 2 4 0\nv 0 4 0\nf 1/1/1 2/2/1 3/3/1 4/4/1\n";
+
+test("an OBJ becomes a binary STL that stands upright and is 80 mm at its longest", () => {
+  const stl = new DataView(objToBinaryStl(SQUARE_OBJ));
+  expect(stl.byteLength).toBe(84 + 2 * 50);
+  expect(stl.getUint32(80, true)).toBe(2);
+  const heights = [0, 1, 2].map((corner) => stl.getFloat32(84 + 12 + corner * 12 + 8, true));
+  expect(Math.max(...heights)).toBeCloseTo(80);
+  expect(() => objToBinaryStl("v 0 0 0\n")).toThrow("no usable faces");
+});
+
+test("with a fal key a design is queued, finished from the polled result, and keeps an STL", async () => {
+  vi.useFakeTimers();
+  const { t } = await seeded();
+  vi.stubEnv("FAL_KEY", "test-key");
+  const queue = "https://queue.fal.run/fal-ai/meshy/requests/req_1";
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.method === "POST") {
+      return Response.json({ request_id: "req_1", status_url: queue + "/status", response_url: queue });
+    }
+    if (url === queue + "/status") return Response.json({ status: "COMPLETED" });
+    if (url === queue) {
+      return Response.json({
+        model_urls: {
+          usdz: { url: "https://v3b.fal.media/files/model.usdz" },
+          obj: { url: "https://v3b.fal.media/files/model.obj" },
+        },
+        thumbnail: { url: "https://v3b.fal.media/files/preview.png" },
+      });
+    }
+    return new Response(SQUARE_OBJ);
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  const productId = await t.mutation(api.products.create, {
+    deviceId: "phone-2",
+    prompt: "A fox that holds my earbuds",
+    filament: "tangerine",
+  });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+
+  const [submitUrl, submit] = fetchMock.mock.calls[0] as [string, RequestInit];
+  expect(submitUrl).toContain("https://queue.fal.run/fal-ai/meshy/v7.1/text-to-3d?fal_webhook=");
+  expect(JSON.parse(submit.body as string)).toMatchObject({ prompt: "A fox that holds my earbuds", mode: "preview" });
+  const product = (await t.query(api.products.get, { productId }))!;
+  expect(product).toMatchObject({
+    status: "ready",
+    printability: "ok",
+    falRequestId: "req_1",
+    usdzUrl: "https://v3b.fal.media/files/model.usdz",
+    thumbnailUrl: "https://v3b.fal.media/files/preview.png",
+  });
+  expect(product.stlUrl).toBeTypeOf("string");
+
+  const hook = (body: string) => t.fetch("/webhooks/fal", { method: "POST", body });
+  expect((await hook(JSON.stringify({ request_id: "req_1" }))).status).toBe(200);
+  expect((await hook(JSON.stringify({ request_id: "unknown" }))).status).toBe(200);
+  expect((await hook("not json")).status).toBe(400);
+});
+
+test("a refused fal request marks the design failed", async () => {
+  vi.useFakeTimers();
+  const { t } = await seeded();
+  vi.stubEnv("FAL_KEY", "test-key");
+  vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 401 })));
+  const productId = await t.mutation(api.products.create, { deviceId: "phone-2", prompt: "A fox", filament: "sky" });
+  await t.finishAllScheduledFunctions(vi.runAllTimers);
+  expect((await t.query(api.products.get, { productId }))!).toMatchObject({
+    status: "failed",
+    failureReason: "The model service refused the request (status 401)",
+  });
 });

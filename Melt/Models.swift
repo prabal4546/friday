@@ -57,6 +57,7 @@ struct Product: Identifiable, Hashable {
     var salesCount: Int
     var printNote: String?
     var failureReason: String?
+    var usdzURL: URL?
 }
 
 struct Duel: Identifiable, Hashable {

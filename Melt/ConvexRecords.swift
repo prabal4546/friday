@@ -28,6 +28,7 @@ struct ProductRecord: Decodable {
     @ConvexFloat var salesCount: Double
     let printNote: String?
     let failureReason: String?
+    let usdzUrl: String?
 
     func product(creatorName fallback: String) -> Product {
         Product(
@@ -36,7 +37,8 @@ struct ProductRecord: Decodable {
             status: Product.Status(rawValue: status) ?? .failed,
             filament: Filament(rawValue: filament) ?? .bone,
             priceCents: Int(priceCents), salesCount: Int(salesCount),
-            printNote: printNote, failureReason: failureReason
+            printNote: printNote, failureReason: failureReason,
+            usdzURL: usdzUrl.flatMap(URL.init(string:))
         )
     }
 }
