@@ -74,6 +74,12 @@ The app reads `CONVEX_DEPLOYMENT_URL` from `Config/Melt.xcconfig`. In an xcconfi
 
 After editing `project.yml`, regenerate the project with `xcodegen generate` and commit the result.
 
+## Agent tooling
+
+`npx convex ai-files install` wrote the Convex guidelines (`convex/_generated/ai/guidelines.md`), the Convex agent skills (`.agents/skills`, copied to `.claude/skills` for Claude Code), and the Convex sections of `AGENTS.md` and `CLAUDE.md`. Run it again to refresh them.
+
+The Convex hackathon skill in `.agents/skills/convex-hackathon-skill` keeps `hackathon.md`, the public build log, current. Ask your coding agent to update the hackathon log after a work session.
+
 ## Revyl
 
 ```sh
