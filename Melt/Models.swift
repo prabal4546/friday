@@ -25,6 +25,7 @@ enum Filament: String, CaseIterable, Identifiable {
 }
 
 struct Profile: Equatable {
+    let id: String
     var displayName: String
     var credits: Int
     var wins: Int
@@ -48,8 +49,8 @@ struct Product: Identifiable, Hashable {
     let id: String
     var name: String
     var prompt: String
+    var creatorId: String
     var creatorName: String
-    var isMine: Bool
     var status: Status
     var filament: Filament
     var priceCents: Int

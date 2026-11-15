@@ -71,8 +71,8 @@ struct DuelRow: View {
                 Spacer()
                 if duel.isLive {
                     Text("\(duel.endsAt, style: .relative) left")
-                } else if let winner = duel.winner {
-                    Text("\(duel.product(winner).name) won")
+                } else {
+                    Text(duel.winner.map { "\(duel.product($0).name) won" } ?? "Tied")
                 }
             }
             .font(.footnote)
@@ -120,7 +120,7 @@ struct DuelDetailView: View {
                         NavigationLink {
                             ProductDetailView(productId: duel.product(side).id)
                         } label: {
-                            ProductRow(product: duel.product(side))
+                            ProductRow(product: duel.product(side), showsCreator: true)
                         }
                     }
                 }
@@ -158,8 +158,8 @@ struct DuelDetailView: View {
                         LabeledContent("Ends in") {
                             Text(duel.endsAt, style: .relative)
                         }
-                    } else if let winner = duel.winner {
-                        LabeledContent("Winner", value: duel.product(winner).name)
+                    } else {
+                        LabeledContent("Winner", value: duel.winner.map { duel.product($0).name } ?? "Tied")
                     }
                 }
                 Section("Prediction pool") {
@@ -180,6 +180,7 @@ extension Stake {
     func summary(in duel: Duel) -> String {
         let position = "You backed \(duel.product(side).name) with \(amount) credits"
         guard let payout else { return position }
-        return payout > 0 ? "\(position) and won \(payout)" : "\(position) and lost them"
+        if payout == 0 { return "\(position) and lost them" }
+        return side == duel.winner ? "\(position) and won \(payout)" : "\(position) and got them back"
     }
 }

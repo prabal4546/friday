@@ -14,7 +14,7 @@ enum Fixtures {
     }
 
     static func empty() -> World {
-        World(profile: Profile(displayName: "You", credits: 1250, wins: 0, earningsCents: 0))
+        World(profile: Profile(id: "You", displayName: "You", credits: 1250, wins: 0, earningsCents: 0))
     }
 
     static func demo(now: Date = .now) -> World {
@@ -23,7 +23,7 @@ enum Fixtures {
             _ filament: Filament, _ priceCents: Int, sold: Int
         ) -> Product {
             Product(
-                id: id, name: name, prompt: prompt, creatorName: creator, isMine: creator == "You",
+                id: id, name: name, prompt: prompt, creatorId: creator, creatorName: creator,
                 status: .published, filament: filament, priceCents: priceCents, salesCount: sold
             )
         }
@@ -32,7 +32,7 @@ enum Fixtures {
             _ filament: Filament, _ priceCents: Int, printNote: String? = nil, failureReason: String? = nil
         ) -> Product {
             Product(
-                id: id, name: name, prompt: prompt, creatorName: "You", isMine: true,
+                id: id, name: name, prompt: prompt, creatorId: "You", creatorName: "You",
                 status: status, filament: filament, priceCents: priceCents, salesCount: 0,
                 printNote: printNote, failureReason: failureReason
             )
@@ -59,7 +59,7 @@ enum Fixtures {
         }
 
         return World(
-            profile: Profile(displayName: "You", credits: 1250, wins: 1, earningsCents: 59950),
+            profile: Profile(id: "You", displayName: "You", credits: 1250, wins: 1, earningsCents: 59950),
             products: [
                 draft(
                     "dragon", "Tiny dragon that guards my charging cable",

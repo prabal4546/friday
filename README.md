@@ -29,11 +29,19 @@ pnpm test
 To run against a local backend with no Convex account:
 
 ```sh
-CONVEX_AGENT_MODE=anonymous pnpm dev     # serves http://127.0.0.1:3210, keep it running
-CONVEX_AGENT_MODE=anonymous pnpm seed    # in a second terminal, safe to repeat
+# serves http://127.0.0.1:3210 and points .env.local at it; keep it running
+CONVEX_AGENT_MODE=anonymous CONVEX_DEPLOYMENT=anonymous:anonymous-agent pnpm dev
+# in a second terminal, safe to repeat
+CONVEX_AGENT_MODE=anonymous pnpm seed
 ```
 
-To use a cloud deployment, which Whop webhooks and TestFlight builds need, run `pnpm exec convex login` once, then `pnpm dev` and `pnpm seed` without the `CONVEX_AGENT_MODE` prefix. Put the deployment's `https://<name>.convex.cloud` URL in `Config/Melt.xcconfig`.
+The app's default backend is the cloud dev deployment `https://wry-skunk-692.convex.cloud`, set in `Config/Melt.xcconfig`. To push backend changes to it, run `pnpm exec convex login` once, then `pnpm dev`. If the CLI was last used with the local backend, point it back at the cloud first:
+
+```sh
+pnpm exec convex dev --once --configure existing --team prabaljit-walia --project melt --dev-deployment cloud
+```
+
+`pnpm exec convex run seed:reset` wipes the deployment and rebuilds the demo world. Run it before a demo so the next device to open the app takes over the seeded "You" profile.
 
 ### Identity
 
@@ -63,7 +71,7 @@ pnpm exec convex env set WHOP_WEBHOOK_SECRET
 
 ## iOS app
 
-Requires Xcode with an iOS 18 or newer Simulator runtime. The app has three tabs, Arena, Create, and Library, and currently runs on built-in fixtures (`Melt/Fixtures.swift`) that mirror the Convex seed, so it needs no backend and no credentials.
+Requires Xcode with an iOS 18 or newer Simulator runtime. The app has three tabs, Arena, Create, and Library, and shows live data from the Convex deployment in `Config/Melt.xcconfig`: stakes, new designs, and settled duels from any client appear without a refresh.
 
 Open `Melt.xcodeproj` in Xcode, pick an iPhone simulator, and press Run. Or from the command line:
 
@@ -76,16 +84,28 @@ xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Melt.app
 xcrun simctl launch booted com.prabaljitwalia.melt
 ```
 
-To see the empty and failed-to-load states, add `-MeltScenario empty` or `-MeltScenario error` to the end of the launch command.
+Launch arguments, added to the end of the launch command:
 
-The UI tests walk the main flow (stake on a duel, open a product preview, generate a design, find it in Library) and both of those states:
+- `-ConvexDeploymentURL http://127.0.0.1:3210` uses the local backend instead of the cloud one.
+- `-MeltScenario demo` runs on built-in fixtures (`Melt/Fixtures.swift`) with no backend at all. `-MeltScenario empty` and `-MeltScenario error` show the empty and failed-to-load states.
+
+The UI tests walk the main flow on fixtures (stake on a duel, open a product preview, generate a design, find it in Library) and both of those states:
 
 ```sh
 xcodebuild test -project Melt.xcodeproj -scheme Melt -derivedDataPath build \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
 ```
 
-`Config/Melt.xcconfig` holds `CONVEX_DEPLOYMENT_URL`, the backend the app connects to once it leaves fixtures. In an xcconfig file `//` starts a comment, so the URL is written as `http:/$()/127.0.0.1:3210`.
+To also run the live test, reset the seed and pass the deployment URL. It stakes on a duel and creates a design on that deployment:
+
+```sh
+pnpm exec convex run seed:reset
+TEST_RUNNER_MELT_LIVE_URL=https://wry-skunk-692.convex.cloud xcodebuild test -project Melt.xcodeproj \
+  -scheme Melt -derivedDataPath build -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+pnpm exec convex run seed:reset
+```
+
+In an xcconfig file `//` starts a comment, so the URL in `Config/Melt.xcconfig` is written as `https:/$()/wry-skunk-692.convex.cloud`.
 
 After editing `project.yml`, regenerate the project with `xcodegen generate` and commit the result.
 
