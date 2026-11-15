@@ -5,8 +5,18 @@ session:
 build:
     framework: ios
     profiles:
-        development:
+        preview:
             ios:
+                app_id: f867bd88-1e8c-447a-bb1a-c5f7744a97cc
                 build_commands:
                     - xcodebuild -project 'Melt.xcodeproj' -scheme 'Melt' -configuration Debug -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' ARCHS=arm64 -derivedDataPath build
                 output_path: build/Build/Products/Debug-iphonesimulator/*.app
+pr_review:
+    enabled: true
+    build:
+        kind: revyl
+        profile: preview
+    proof_of_changes:
+        enabled: true
+        harness:
+            kind: revyl

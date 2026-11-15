@@ -91,11 +91,12 @@ After editing `project.yml`, regenerate the project with `xcodegen generate` and
 
 ## Revyl
 
+`.revyl/config.yaml` has one `preview` profile that builds the simulator app on Revyl's cloud runners, and turns on Proof of Changes for pull requests. Proof of Changes needs the Revyl GitHub App installed on this repository.
+
 ```sh
 revyl auth login
-revyl app create --name "Melt iOS" --platform ios   # put the ID in build.profiles.development.ios.app_id
-revyl config validate
-revyl build --profile development --platform ios
+revyl build --profile preview --platform ios
+revyl device start --app-id f867bd88-1e8c-447a-bb1a-c5f7744a97cc --open
 ```
 
 Revyl's cloud simulators cannot reach a backend on your machine, so point `Config/Melt.xcconfig` at a cloud Convex deployment before building there.
