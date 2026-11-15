@@ -4,8 +4,11 @@ import SwiftUI
 
 struct ProductDetailView: View {
     @EnvironmentObject private var store: MeltStore
+    @Environment(\.openURL) private var openURL
     let productId: String
     @State private var errorMessage: String?
+    @State private var commerceMessage: String?
+    @State private var isWorking = false
 
     var body: some View {
         if let product = store.product(id: productId) {
@@ -14,6 +17,50 @@ struct ProductDetailView: View {
                     ModelPreview(product: product)
                         .frame(height: 300)
                         .listRowInsets(EdgeInsets())
+                }
+                if product.status == .ready, product.creatorId == store.profile?.id {
+                    Section("Sell this design") {
+                        LabeledContent("Storefront price", value: dollars(product.priceCents))
+                        Button("Publish for \(dollars(product.priceCents))") {
+                            isWorking = true
+                            Task {
+                                do {
+                                    try await store.publish(productId: product.id, priceCents: product.priceCents)
+                                    commerceMessage = "Published. This design is now in the Shop."
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
+                                isWorking = false
+                            }
+                        }
+                        .disabled(isWorking)
+                    }
+                } else if product.status == .published, product.creatorId != store.profile?.id {
+                    Section("Order") {
+                        Button("Buy for \(dollars(product.priceCents))") {
+                            isWorking = true
+                            Task {
+                                do {
+                                    if let checkout = try await store.checkout(productId: product.id) {
+                                        openURL(checkout)
+                                    } else {
+                                        commerceMessage = "Demo payment complete. Your order is now Paid."
+                                    }
+                                } catch {
+                                    errorMessage = error.localizedDescription
+                                }
+                                isWorking = false
+                            }
+                        }
+                        .disabled(isWorking)
+                        if isWorking { ProgressView("Preparing checkout") }
+                    }
+                }
+                if let commerceMessage {
+                    Section {
+                        Label(commerceMessage, systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                    }
                 }
                 if product.status == .ready, product.creatorId == store.profile?.id {
                     Section("Filament") {
@@ -51,7 +98,7 @@ struct ProductDetailView: View {
             }
             .navigationTitle(product.name)
             .navigationBarTitleDisplayMode(.inline)
-            .errorAlert("Couldn't change the filament", message: $errorMessage)
+            .errorAlert("Couldn't complete that action", message: $errorMessage)
         } else {
             ContentUnavailableView("This product is gone", systemImage: "questionmark.circle")
         }

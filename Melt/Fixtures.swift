@@ -8,9 +8,12 @@ enum Fixtures {
     struct World {
         var profile: Profile
         var products: [Product] = []
+        var storefront: [Product] = []
         var liveDuels: [Duel] = []
         var settledDuels: [Duel] = []
         var stakes: [Stake] = []
+        var orders: [Order] = []
+        var sales: [Order] = []
     }
 
     static func empty() -> World {
@@ -79,6 +82,7 @@ enum Fixtures {
                 ),
                 vase,
             ],
+            storefront: [ghost, fox, duck, bins, egg, capybara, vase],
             liveDuels: [
                 duel("live-1", capybara, ghost, hours: 5.69, live: true, sales: (14, 11), pools: (3200, 2450)),
                 duel("live-2", fox, duck, hours: 11.09, live: true, sales: (8, 9), pools: (1100, 1900)),
@@ -91,6 +95,20 @@ enum Fixtures {
             stakes: [
                 Stake(duelId: "settled-1", side: .a, amount: 200, payout: 340),
                 Stake(duelId: "settled-2", side: .a, amount: 100, payout: 0),
+            ],
+            orders: [
+                Order(
+                    id: "order-bought", productId: ghost.id, productName: ghost.name,
+                    buyerName: "You", creatorName: ghost.creatorName, filament: ghost.filament,
+                    amountCents: ghost.priceCents, status: .paid, fulfillment: .printing
+                )
+            ],
+            sales: [
+                Order(
+                    id: "order-sale", productId: vase.id, productName: vase.name,
+                    buyerName: "Priya Raman", creatorName: "You", filament: vase.filament,
+                    amountCents: vase.priceCents, status: .paid, fulfillment: .queued
+                )
             ]
         )
     }

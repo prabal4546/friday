@@ -24,13 +24,26 @@ http.route({
     });
     if (!verified) return new Response("Invalid webhook signature", { status: 401 });
 
-    const event = JSON.parse(body);
-    if (event.type === "payment.succeeded") {
-      const metadata = event.data.metadata ?? {};
+    let event: unknown;
+    try {
+      event = JSON.parse(body);
+    } catch {
+      return new Response("Expected a JSON body", { status: 400 });
+    }
+    const root = typeof event === "object" && event !== null ? (event as Record<string, unknown>) : null;
+    const data =
+      typeof root?.data === "object" && root.data !== null ? (root.data as Record<string, unknown>) : null;
+    if (root?.type === "payment.succeeded") {
+      if (typeof data?.id !== "string") return new Response("Missing payment id", { status: 400 });
+      const metadata =
+        typeof data.metadata === "object" && data.metadata !== null
+          ? (data.metadata as Record<string, unknown>)
+          : {};
       await ctx.runMutation(internal.orders.markPaid, {
-        whopPaymentId: event.data.id,
+        whopPaymentId: data.id,
         orderId: typeof metadata.orderId === "string" ? metadata.orderId : undefined,
-        whopCheckoutId: event.data.checkout_configuration_id ?? undefined,
+        whopCheckoutId:
+          typeof data.checkout_configuration_id === "string" ? data.checkout_configuration_id : undefined,
       });
     }
     return new Response(null, { status: 200 });

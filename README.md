@@ -2,7 +2,7 @@
 
 Melt is a native SwiftUI iOS app for the Consumer Mobile Hackathon: describe a product, get a 3D-printable model, sell it through Whop, and duel other creators on sales while everyone else stakes demo credits on the winner.
 
-This repository holds the Convex backend, the SwiftUI app, the Whop sandbox payment boundary, and the Revyl build config. Browsing, staking, and generating a design work today. Publishing to a storefront, checkout from the app, and print fulfillment are not built yet.
+This repository holds the Convex backend, the SwiftUI app, the Whop sandbox payment boundary, and the Revyl build config. Browsing, staking, generating and publishing a design, checkout, creator earnings, and demo print fulfillment work today.
 
 ## Layout
 
@@ -84,9 +84,23 @@ In the app, a design's page downloads the USDZ once, caches it in the app's Cach
 
 `whop:createCheckout` records a pending order, then creates a one-time checkout whose metadata carries `productId`, `creatorId`, and `orderId`. The webhook verifies the Standard Webhooks signature, marks the order paid exactly once, and counts the sale toward the product's live duel. A paid order stops at fulfillment `queued`; nothing is sent to a print service.
 
+The Shop tab lists every published design. A buyer opens one and taps Buy; with `WHOP_API_KEY` set, Melt opens Whop's hosted sandbox checkout. The payment webhook is the only path that marks that order paid. Without a key, the same button makes an explicitly labelled demo payment so the two-person judge flow remains runnable.
+
+Paid orders appear live on both devices: the buyer sees the order in Library, while the creator sees the sale and earnings. The creator can advance it through **Paid → Submitted → Printing**. Submitted creates a local Slant draft ID and quote; the app never calls a production print endpoint.
+
+To prove the no-key flow from the CLI after seeding, use two distinct device IDs:
+
+```sh
+pnpm exec convex run profiles:ensure '{"deviceId":"seller","claimSeed":true}'
+pnpm exec convex run profiles:ensure '{"deviceId":"buyer","displayName":"Judge Buyer"}'
+pnpm exec convex run products:storefront '{}'
+pnpm exec convex run orders:mine '{"deviceId":"buyer"}'
+pnpm exec convex run orders:sales '{"deviceId":"seller"}'
+```
+
 ## iOS app
 
-Requires Xcode with an iOS 18 or newer Simulator runtime. The app has three tabs, Arena, Create, and Library, and shows live data from the Convex deployment in `Config/Melt.xcconfig`: stakes, new designs, and settled duels from any client appear without a refresh.
+Requires Xcode with an iOS 18 or newer Simulator runtime. The app has four tabs, Arena, Shop, Create, and Library, and shows live data from the Convex deployment in `Config/Melt.xcconfig`: stakes, published products, orders, earnings, fulfillment, new designs, and settled duels from any client appear without a refresh.
 
 Open `Melt.xcodeproj` in Xcode, pick an iPhone simulator, and press Run. Or from the command line:
 

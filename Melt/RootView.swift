@@ -6,6 +6,7 @@ struct RootView: View {
     var body: some View {
         TabView {
             Tab("Arena", systemImage: "flame") { ArenaView() }
+            Tab("Shop", systemImage: "bag") { StorefrontView() }
             Tab("Create", systemImage: "wand.and.stars") { CreateView() }
             Tab("Library", systemImage: "square.grid.2x2") { LibraryView() }
         }

@@ -109,6 +109,7 @@ test("checkout carries productId, creatorId, and orderId, and a signed payment i
   expect(checkout.purchaseUrl).toBe("https://sandbox.whop.com/checkout/ch_test");
   const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
   expect(url).toBe("https://sandbox-api.whop.com/api/v1/checkout_configurations");
+  expect(new Headers(init.headers).get("Idempotency-Key")).toBe(checkout.orderId);
   const sent = JSON.parse(init.body as string);
   expect(sent.metadata).toEqual({ productId: fox._id, creatorId: fox.creatorId, orderId: checkout.orderId });
   expect(sent.variant).toMatchObject({ billing_type: "one_time", initial_price: 15, currency: "usd" });
@@ -130,16 +131,42 @@ test("checkout carries productId, creatorId, and orderId, and a signed payment i
   expect(duel.productA.salesCount).toBe(fox.salesCount + 1);
 });
 
-test("checkout refuses to run without a Whop key and records a failed Whop call", async () => {
+test("publish, demo checkout, creator earnings, and draft fulfillment work without external keys", async () => {
   const { t, foxVsDuck } = await seeded();
-  const args = { deviceId: "phone-2", productId: foxVsDuck.productA._id };
-  await expect(t.action(api.whop.createCheckout, args)).rejects.toThrow("WHOP_API_KEY");
+  const rocket = (await t.query(api.products.mine, { deviceId: "phone-1" })).find(
+    (product) => product.name === "Rocket pen cup",
+  )!;
+  await t.mutation(api.products.publish, { deviceId: "phone-1", productId: rocket._id, priceCents: 2000 });
+  expect((await t.query(api.products.storefront, {})).some((product) => product._id === rocket._id)).toBe(true);
+
+  const checkout = await t.action(api.whop.createCheckout, { deviceId: "phone-2", productId: rocket._id });
+  expect(checkout).toMatchObject({ demo: true, purchaseUrl: null });
+  expect((await t.query(api.orders.mine, { deviceId: "phone-2" }))[0]).toMatchObject({
+    productName: "Rocket pen cup",
+    status: "paid",
+    fulfillment: "queued",
+  });
+  expect((await t.query(api.profiles.me, { deviceId: "phone-1" }))!.earningsCents).toBe(59950 + 1480);
+
+  expect(
+    await t.mutation(api.orders.advanceFulfillment, { deviceId: "phone-1", orderId: checkout.orderId }),
+  ).toBe("submitted");
+  let sale = (await t.query(api.orders.sales, { deviceId: "phone-1" }))[0];
+  expect(sale).toMatchObject({ fulfillment: "submitted", slantQuoteCents: 970 });
+  expect(sale.slantOrderId).toMatch(/^draft:/);
+  expect(
+    await t.mutation(api.orders.advanceFulfillment, { deviceId: "phone-1", orderId: checkout.orderId }),
+  ).toBe("printing");
+  sale = (await t.query(api.orders.sales, { deviceId: "phone-1" }))[0];
+  expect(sale.fulfillment).toBe("printing");
 
   vi.stubEnv("WHOP_API_KEY", "test-key");
   vi.stubGlobal("fetch", vi.fn(async () => new Response("nope", { status: 401 })));
-  await expect(t.action(api.whop.createCheckout, args)).rejects.toThrow("status 401");
+  await expect(
+    t.action(api.whop.createCheckout, { deviceId: "phone-2", productId: foxVsDuck.productA._id }),
+  ).rejects.toThrow("status 401");
   const orders = await t.query(api.orders.mine, { deviceId: "phone-2" });
-  expect(orders.map((order) => order.status)).toEqual(["failed"]);
+  expect(orders.map((order) => order.status).sort()).toEqual(["failed", "paid"]);
 });
 
 test("a new design starts generating and the stand-in turns it into a draft", async () => {

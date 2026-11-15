@@ -13,9 +13,12 @@ final class MeltStore: ObservableObject {
     @Published private(set) var phase = Phase.loading
     @Published private(set) var profile: Profile?
     @Published private(set) var products: [Product] = []
+    @Published private(set) var storefront: [Product] = []
     @Published private(set) var liveDuels: [Duel] = []
     @Published private(set) var settledDuels: [Duel] = []
     @Published private(set) var stakes: [Stake] = []
+    @Published private(set) var orders: [Order] = []
+    @Published private(set) var sales: [Order] = []
 
     private let scenario = Fixtures.Scenario(rawValue: UserDefaults.standard.string(forKey: "MeltScenario") ?? "")
     private let deviceId = DeviceIdentity.current()
@@ -39,7 +42,7 @@ final class MeltStore: ObservableObject {
             phase = .failed(Self.message(for: error))
             return
         }
-        awaited = ["profiles:me", "duels:live", "products:mine"]
+        awaited = ["profiles:me", "duels:live", "products:mine", "products:storefront", "orders:mine", "orders:sales"]
         let mine: [String: ConvexEncodable?] = ["deviceId": deviceId]
         watch("profiles:me", with: mine) { [weak self] (record: ProfileRecord?) in
             self?.profile = record?.profile
@@ -53,8 +56,17 @@ final class MeltStore: ObservableObject {
         watch("products:mine", with: mine) { [weak self] (records: [ProductRecord]) in
             self?.products = records.map { $0.product(creatorName: "You") }
         }
+        watch("products:storefront") { [weak self] (records: [ProductRecord]) in
+            self?.storefront = records.map { $0.product(creatorName: "Unknown") }
+        }
         watch("stakes:mine", with: mine) { [weak self] (records: [StakeRecord]) in
             self?.stakes = records.compactMap(\.stake)
+        }
+        watch("orders:mine", with: mine) { [weak self] (records: [OrderRecord]) in
+            self?.orders = records.map(\.order)
+        }
+        watch("orders:sales", with: mine) { [weak self] (records: [OrderRecord]) in
+            self?.sales = records.map(\.order)
         }
     }
 
@@ -64,7 +76,7 @@ final class MeltStore: ObservableObject {
 
     func product(id: String) -> Product? {
         let inDuels = (liveDuels + settledDuels).flatMap { [$0.productA, $0.productB] }
-        return (products + inDuels).first { $0.id == id }
+        return (products + storefront + inDuels).first { $0.id == id }
     }
 
     func stake(for duelId: String) -> Stake? {
@@ -111,6 +123,69 @@ final class MeltStore: ObservableObject {
             try await client.mutation(
                 "products:setFilament",
                 with: ["deviceId": deviceId, "productId": productId, "filament": filament.rawValue]
+            )
+        } catch {
+            throw MeltError(Self.message(for: error))
+        }
+    }
+
+    func publish(productId: String, priceCents: Int) async throws {
+        if scenario != nil {
+            guard let index = products.firstIndex(where: { $0.id == productId }) else { return }
+            products[index].status = .published
+            products[index].priceCents = priceCents
+            storefront.insert(products[index], at: 0)
+            return
+        }
+        do {
+            try await client.mutation(
+                "products:publish",
+                with: ["deviceId": deviceId, "productId": productId, "priceCents": Double(priceCents)]
+            )
+        } catch {
+            throw MeltError(Self.message(for: error))
+        }
+    }
+
+    func checkout(productId: String) async throws -> URL? {
+        if scenario != nil {
+            guard let product = storefront.first(where: { $0.id == productId }) else { return nil }
+            orders.insert(
+                Order(
+                    id: "demo-\(UUID().uuidString)", productId: product.id, productName: product.name,
+                    buyerName: profile?.displayName ?? "You", creatorName: product.creatorName,
+                    filament: product.filament, amountCents: product.priceCents,
+                    status: .paid, fulfillment: .queued
+                ),
+                at: 0
+            )
+            return nil
+        }
+        do {
+            let checkout: CheckoutRecord = try await client.action(
+                "whop:createCheckout", with: ["deviceId": deviceId, "productId": productId]
+            )
+            return checkout.purchaseUrl.flatMap(URL.init(string:))
+        } catch {
+            throw MeltError(Self.message(for: error))
+        }
+    }
+
+    func advanceFulfillment(orderId: String) async throws {
+        if scenario != nil {
+            guard let index = sales.firstIndex(where: { $0.id == orderId }) else { return }
+            if sales[index].fulfillment == .queued {
+                sales[index].fulfillment = .submitted
+                sales[index].slantQuoteCents = 1_010
+                sales[index].slantOrderId = "draft:\(orderId)"
+            } else if sales[index].fulfillment == .submitted {
+                sales[index].fulfillment = .printing
+            }
+            return
+        }
+        do {
+            let _: String = try await client.mutation(
+                "orders:advanceFulfillment", with: ["deviceId": deviceId, "orderId": orderId]
             )
         } catch {
             throw MeltError(Self.message(for: error))
@@ -184,9 +259,12 @@ final class MeltStore: ObservableObject {
         let world = scenario == .empty ? Fixtures.empty() : Fixtures.demo()
         profile = world.profile
         products = world.products
+        storefront = world.storefront
         liveDuels = world.liveDuels
         settledDuels = world.settledDuels
         stakes = world.stakes
+        orders = world.orders
+        sales = world.sales
         phase = .ready
     }
 

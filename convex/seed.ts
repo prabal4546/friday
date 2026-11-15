@@ -150,6 +150,17 @@ async function seedWorld(ctx: MutationCtx) {
       whopPaymentId: "seed:pay_1042",
       paidAt: now - 20 * HOUR,
     });
+    await ctx.db.insert("orders", {
+      productId: vase,
+      buyerId: priya,
+      creatorId: you,
+      filament: "sky",
+      amountCents: 2200,
+      status: "paid",
+      fulfillment: "queued",
+      whopPaymentId: "seed:pay_creator_1",
+      paidAt: now - 2 * HOUR,
+    });
 }
 
 export const run = internalMutation({

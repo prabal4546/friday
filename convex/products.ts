@@ -35,13 +35,25 @@ export const mine = query({
   },
 });
 
+export const storefront = query({
+  args: {},
+  handler: async (ctx) => {
+    const products = await ctx.db
+      .query("products")
+      .withIndex("by_status", (q) => q.eq("status", "published"))
+      .order("desc")
+      .take(50);
+    return await Promise.all(products.map((product) => productSummary(ctx, product)));
+  },
+});
+
 export const get = query({
   args: { productId: v.id("products") },
   handler: async (ctx, args) => await ctx.db.get(args.productId),
 });
 
 export const publish = mutation({
-  args: { deviceId: v.string(), productId: v.id("products") },
+  args: { deviceId: v.string(), productId: v.id("products"), priceCents: v.number() },
   handler: async (ctx, args) => {
     const profile = await requireProfile(ctx, args.deviceId);
     const product = await ctx.db.get(args.productId);
@@ -49,7 +61,10 @@ export const publish = mutation({
       throw new ConvexError("Only the creator can publish this product");
     }
     if (product.status !== "ready") throw new ConvexError("Only a ready draft can be published");
-    await ctx.db.patch(product._id, { status: "published" });
+    if (!Number.isInteger(args.priceCents) || args.priceCents < 500 || args.priceCents > 50_000) {
+      throw new ConvexError("Choose a price from $5 to $500");
+    }
+    await ctx.db.patch(product._id, { status: "published", priceCents: args.priceCents });
   },
 });
 

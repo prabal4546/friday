@@ -7,10 +7,14 @@ const API_VERSION_DATE = "2026-11-13-1";
 
 export const createCheckout = action({
   args: { deviceId: v.string(), productId: v.id("products") },
-  handler: async (ctx, args): Promise<{ orderId: Id<"orders">; purchaseUrl: string }> => {
+  handler: async (
+    ctx,
+    args,
+  ): Promise<{ orderId: Id<"orders">; purchaseUrl: string | null; demo: boolean }> => {
     const apiKey = process.env.WHOP_API_KEY;
     if (apiKey === undefined) {
-      throw new ConvexError("Whop is not configured: set WHOP_API_KEY on the Convex deployment");
+      const orderId = await ctx.runMutation(internal.orders.createDemoPaid, args);
+      return { orderId, purchaseUrl: null, demo: true };
     }
     const baseUrl =
       process.env.WHOP_ENVIRONMENT === "production"
@@ -24,6 +28,7 @@ export const createCheckout = action({
         Authorization: `Bearer ${apiKey}`,
         "Content-Type": "application/json",
         "Api-Version-Date": API_VERSION_DATE,
+        "Idempotency-Key": order.orderId,
       },
       body: JSON.stringify({
         variant: {
@@ -52,6 +57,6 @@ export const createCheckout = action({
       whopCheckoutId: checkout.id,
       purchaseUrl: checkout.purchase_url,
     });
-    return { orderId: order.orderId, purchaseUrl: checkout.purchase_url };
+    return { orderId: order.orderId, purchaseUrl: checkout.purchase_url, demo: false };
   },
 });

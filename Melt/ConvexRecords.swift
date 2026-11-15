@@ -78,3 +78,37 @@ struct StakeRecord: Decodable {
         return Stake(duelId: duelId, side: side, amount: Int(amount), payout: payout.map { Int($0) })
     }
 }
+
+struct OrderRecord: Decodable {
+    let _id: String
+    let productId: String
+    let productName: String
+    let buyerName: String
+    let creatorName: String
+    let filament: String
+    @ConvexFloat var amountCents: Double
+    let status: String
+    let fulfillment: String
+    let purchaseUrl: String?
+    @OptionalConvexFloat var slantQuoteCents: Double?
+    let slantOrderId: String?
+
+    var order: Order {
+        Order(
+            id: _id, productId: productId, productName: productName,
+            buyerName: buyerName, creatorName: creatorName,
+            filament: Filament(rawValue: filament) ?? .bone,
+            amountCents: Int(amountCents),
+            status: Order.PaymentStatus(rawValue: status) ?? .failed,
+            fulfillment: Order.Fulfillment(rawValue: fulfillment) ?? .none,
+            purchaseURL: purchaseUrl.flatMap(URL.init(string:)),
+            slantQuoteCents: slantQuoteCents.map(Int.init), slantOrderId: slantOrderId
+        )
+    }
+}
+
+struct CheckoutRecord: Decodable {
+    let orderId: String
+    let purchaseUrl: String?
+    let demo: Bool
+}

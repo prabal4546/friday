@@ -55,10 +55,82 @@ struct LibraryView: View {
                             }
                         }
                     }
+                    if !store.orders.isEmpty {
+                        Section("My orders") {
+                            ForEach(store.orders) { order in
+                                OrderRow(order: order, role: .buyer)
+                            }
+                        }
+                    }
+                    if !store.sales.isEmpty {
+                        Section("Sales to fulfill") {
+                            ForEach(store.sales) { order in
+                                OrderRow(order: order, role: .creator)
+                            }
+                        }
+                    }
                 }
             }
             .navigationTitle("Library")
         }
+    }
+}
+
+struct OrderRow: View {
+    enum Role { case buyer, creator }
+
+    @EnvironmentObject private var store: MeltStore
+    let order: Order
+    let role: Role
+    @State private var errorMessage: String?
+    @State private var isWorking = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack {
+                Text(order.productName).font(.headline)
+                Spacer()
+                Text(dollars(order.amountCents)).foregroundStyle(.secondary)
+            }
+            Text(role == .buyer ? "By \(order.creatorName)" : "For \(order.buyerName)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            HStack(spacing: 6) {
+                ForEach([Order.Fulfillment.queued, .submitted, .printing], id: \.rawValue) { step in
+                    Label(step.label, systemImage: reached(step) ? "checkmark.circle.fill" : "circle")
+                        .labelStyle(.iconOnly)
+                        .foregroundStyle(reached(step) ? Color.green : Color.gray.opacity(0.4))
+                    if step != .printing { Rectangle().frame(height: 1).foregroundStyle(.tertiary) }
+                }
+                Text(order.fulfillment.label).font(.caption.bold())
+            }
+            if let quote = order.slantQuoteCents {
+                Text("Slant draft quote \(dollars(quote)) · production disabled")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            if role == .creator, order.fulfillment == .queued || order.fulfillment == .submitted {
+                Button(order.fulfillment == .queued ? "Submit print draft" : "Start demo printing") {
+                    isWorking = true
+                    Task {
+                        do {
+                            try await store.advanceFulfillment(orderId: order.id)
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                        isWorking = false
+                    }
+                }
+                .disabled(isWorking)
+            }
+        }
+        .padding(.vertical, 4)
+        .errorAlert("Couldn't advance fulfillment", message: $errorMessage)
+    }
+
+    private func reached(_ step: Order.Fulfillment) -> Bool {
+        let rank: [Order.Fulfillment: Int] = [.none: 0, .queued: 1, .submitted: 2, .printing: 3]
+        return rank[order.fulfillment, default: 0] >= rank[step, default: 0]
     }
 }
 

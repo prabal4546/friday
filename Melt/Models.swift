@@ -85,6 +85,38 @@ struct Stake: Hashable {
     var payout: Int?
 }
 
+struct Order: Identifiable, Hashable {
+    enum PaymentStatus: String {
+        case pending, paid, failed
+    }
+
+    enum Fulfillment: String {
+        case none, queued, submitted, printing
+
+        var label: String {
+            switch self {
+            case .none: "Awaiting payment"
+            case .queued: "Paid"
+            case .submitted: "Submitted"
+            case .printing: "Printing"
+            }
+        }
+    }
+
+    let id: String
+    let productId: String
+    var productName: String
+    var buyerName: String
+    var creatorName: String
+    var filament: Filament
+    var amountCents: Int
+    var status: PaymentStatus
+    var fulfillment: Fulfillment
+    var purchaseURL: URL?
+    var slantQuoteCents: Int?
+    var slantOrderId: String?
+}
+
 struct MeltError: LocalizedError {
     let errorDescription: String?
 

@@ -85,8 +85,10 @@ export default defineSchema({
     paidAt: v.optional(v.number()),
     failureReason: v.optional(v.string()),
     slantOrderId: v.optional(v.string()),
+    slantQuoteCents: v.optional(v.number()),
   })
     .index("by_buyer", ["buyerId"])
+    .index("by_creator", ["creatorId"])
     .index("by_whopCheckoutId", ["whopCheckoutId"])
     .index("by_whopPaymentId", ["whopPaymentId"]),
 

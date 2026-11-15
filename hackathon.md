@@ -12,7 +12,7 @@
 - **Auth:** none
 - **AI models:** fal-ai/meshy/v7.1/text-to-3d (called through fal)
 - **Started:** 2026-11-15T22:06:44Z
-- **Last updated:** 2026-11-15T23:18:29Z
+- **Last updated:** 2026-11-15T23:48:30Z
 
 ## Log
 
@@ -59,3 +59,17 @@ saves the choice. Convex features: actions, HTTP actions, scheduled functions,
 file storage, mutations (`convex/generation.ts`, `convex/lib/stl.ts`,
 `convex/http.ts`, `convex/products.ts`, `Melt/ProductDetailView.swift`,
 `Melt/FilamentPicker.swift`).
+
+### 2026-11-15 - working tree
+Added a live creator storefront and the two-device commerce loop. A creator can
+publish a ready design; another device can open it in Shop and create a one-time
+Whop sandbox checkout. The signed payment webhook applies a sale idempotently,
+increments the duel, and updates creator earnings. Without a Whop key, checkout
+uses an explicit demo payment so the judge flow stays runnable. Orders subscribe
+on both sides, and creators can move a sale through Paid, Submitted, and Printing;
+Submitted records a local Slant quote and draft ID without calling production.
+The complete no-key flow was exercised on the dev deployment with separate
+seller and buyer device IDs. Convex features: queries, mutations, actions, HTTP
+actions, realtime queries (`convex/products.ts`, `convex/orders.ts`,
+`convex/whop.ts`, `convex/http.ts`, `Melt/StorefrontView.swift`,
+`Melt/LibraryView.swift`).
