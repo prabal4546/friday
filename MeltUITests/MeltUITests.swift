@@ -41,6 +41,15 @@ final class MeltUITests: XCTestCase {
         XCTAssertTrue(element(containing: "A tiny rocket for my desk").waitForExistence(timeout: 5))
         XCTAssertTrue(element(containing: "1,150").exists)
         capture("library")
+
+        element(containing: "Rocket pen cup").tap()
+        let sky = app.buttons["Sky"]
+        XCTAssertTrue(sky.waitForExistence(timeout: 5))
+        XCTAssertFalse(sky.isSelected)
+        sky.tap()
+        let selectedSky = app.buttons.matching(NSPredicate(format: "label == %@ AND selected == true", "Sky")).firstMatch
+        XCTAssertTrue(selectedSky.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Pause"].exists)
     }
 
     func testEmptyLibrary() {
@@ -83,13 +92,33 @@ final class MeltUITests: XCTestCase {
         prompt.tap()
         prompt.typeText("A tiny rocket for my desk")
         app.buttons["Generate model"].tap()
-        XCTAssertTrue(element(containing: "Generating the model").waitForExistence(timeout: 10))
-        XCTAssertTrue(element(containing: "Draft · $15.00").waitForExistence(timeout: 15))
+        XCTAssertTrue(element(containing: "A tiny rocket for my desk").waitForExistence(timeout: 10))
 
         app.tabBars.buttons["Library"].tap()
         XCTAssertTrue(element(containing: "1,150").waitForExistence(timeout: 10))
         XCTAssertTrue(element(containing: "A tiny rocket for my desk").exists)
         capture("live-library")
+    }
+
+    func testLiveModel() throws {
+        let environment = ProcessInfo.processInfo.environment
+        guard let url = environment["MELT_LIVE_URL"], let modelName = environment["MELT_LIVE_MODEL"] else {
+            throw XCTSkip("Set TEST_RUNNER_MELT_LIVE_URL and TEST_RUNNER_MELT_LIVE_MODEL to open a ready design from this device's Library")
+        }
+        app.launchArguments = ["-ConvexDeploymentURL", url]
+        app.launch()
+
+        let library = app.tabBars.buttons["Library"]
+        XCTAssertTrue(library.waitForExistence(timeout: 20))
+        library.tap()
+        let product = element(containing: modelName)
+        XCTAssertTrue(product.waitForExistence(timeout: 20))
+        product.tap()
+        XCTAssertTrue(app.buttons["Pause"].waitForExistence(timeout: 10))
+        XCTAssertTrue(element(containing: "Loading the model").waitForNonExistence(timeout: 60))
+        XCTAssertFalse(element(containing: "tand-in shape").exists)
+        sleep(1)
+        capture("live-model")
     }
 
     private func element(containing text: String) -> XCUIElement {

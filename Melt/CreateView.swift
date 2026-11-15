@@ -23,26 +23,7 @@ struct CreateView: View {
                             .accessibilityIdentifier("prompt")
                     }
                     Section("Filament") {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 12) {
-                                ForEach(Filament.allCases) { option in
-                                    Button {
-                                        filament = option
-                                    } label: {
-                                        Circle()
-                                            .fill(option.color)
-                                            .frame(width: 36, height: 36)
-                                            .overlay {
-                                                Circle().strokeBorder(.primary, lineWidth: option == filament ? 3 : 0)
-                                            }
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel(option.label)
-                                    .accessibilityAddTraits(option == filament ? .isSelected : [])
-                                }
-                            }
-                            .padding(.vertical, 4)
-                        }
+                        FilamentPicker(selection: $filament)
                         LabeledContent("Color", value: filament.label)
                     }
                     Section {

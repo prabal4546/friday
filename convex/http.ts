@@ -40,8 +40,20 @@ http.route({
 http.route({
   path: "/webhooks/fal",
   method: "POST",
-  handler: httpAction(async () => {
-    return new Response("fal webhook handling is not implemented yet", { status: 501 });
+  handler: httpAction(async (ctx, request) => {
+    let body: unknown;
+    try {
+      body = await request.json();
+    } catch {
+      return new Response("Expected a JSON body", { status: 400 });
+    }
+    const requestId = (body as Record<string, unknown> | null)?.request_id;
+    if (typeof requestId !== "string") return new Response("Missing request_id", { status: 400 });
+    const product = await ctx.runQuery(internal.products.byFalRequest, { requestId });
+    if (product !== null && product.status === "generating") {
+      await ctx.scheduler.runAfter(0, internal.generation.poll, { productId: product._id, attempt: 1 });
+    }
+    return new Response(null, { status: 200 });
   }),
 });
 

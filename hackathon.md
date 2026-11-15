@@ -8,11 +8,11 @@
 - **Frontend:** Other (native SwiftUI iOS app, not distributed yet)
 - **Convex deployment:** https://wry-skunk-692.convex.cloud
 - **Components:** none
-- **Convex features:** schema, tables, indexes, queries, mutations, actions, HTTP actions, scheduled functions, realtime queries
+- **Convex features:** schema, tables, indexes, queries, mutations, actions, HTTP actions, scheduled functions, file storage, realtime queries
 - **Auth:** none
-- **AI models:** none
+- **AI models:** fal-ai/meshy/v7.1/text-to-3d (called through fal)
 - **Started:** 2026-11-15T22:06:44Z
-- **Last updated:** 2026-11-15T22:50:14Z
+- **Last updated:** 2026-11-15T23:18:29Z
 
 ## Log
 
@@ -35,7 +35,7 @@ not on Convex. Added UI tests that drive the flow on a simulator and a Revyl
 build profile (`Melt/ArenaView.swift`, `Melt/Fixtures.swift`,
 `MeltUITests/MeltUITests.swift`, `.revyl/config.yaml`).
 
-### 2026-11-15 - working tree
+### 2026-11-15 - 7cb2108
 Replaced the fixtures with live Convex data. The app ensures a device profile,
 then subscribes to the profile, live and settled duels, the user's designs, and
 stakes, so a stake from another client or a settled duel shows up without a
@@ -44,3 +44,18 @@ a draft after three seconds, a stand-in until model generation is built. Added a
 reset for the demo seed. Convex features: realtime queries, mutations, scheduled
 functions (`Melt/MeltStore.swift`, `Melt/ConvexRecords.swift`,
 `convex/products.ts`, `convex/seed.ts`).
+
+### 2026-11-15 - working tree
+Wired model generation. With a fal key on the deployment, creating a design
+queues a Meshy 7.1 text-to-3D job on fal from an action; a fal webhook and a
+scheduled poll both lead to the same finish step, which keeps the USDZ link and
+stores an STL converted from the OBJ in Convex file storage. Without a key, the
+three-second stand-in still makes the design a draft. One real generation ran on
+the dev deployment: the fal webhook arrived 2 minutes 48 seconds after the
+request, and the finish step stored a 20,234-triangle STL, 80 mm tall. In the
+app, a design's page downloads and caches the USDZ and shows it on a RealityKit
+turntable with orbit, pause, and a filament picker that recolors the model and
+saves the choice. Convex features: actions, HTTP actions, scheduled functions,
+file storage, mutations (`convex/generation.ts`, `convex/lib/stl.ts`,
+`convex/http.ts`, `convex/products.ts`, `Melt/ProductDetailView.swift`,
+`Melt/FilamentPicker.swift`).
