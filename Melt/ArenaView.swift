@@ -12,6 +12,18 @@ struct ArenaView: View {
                             LabeledContent("Your credits", value: profile.credits.formatted())
                         }
                     }
+                    Section("Create together") {
+                        NavigationLink {
+                            StorefrontView()
+                        } label: {
+                            Label("Browse creator storefront", systemImage: "bag")
+                        }
+                        NavigationLink {
+                            NewDuelView()
+                        } label: {
+                            Label("Start a duel with a friend", systemImage: "plus.circle")
+                        }
+                    }
                     Section("Live duels") {
                         if store.liveDuels.isEmpty {
                             ContentUnavailableView(
@@ -43,6 +55,64 @@ struct ArenaView: View {
             }
             .navigationTitle("Arena")
         }
+    }
+}
+
+struct NewDuelView: View {
+    @EnvironmentObject private var store: MeltStore
+    @Environment(\.dismiss) private var dismiss
+    @State private var productId = ""
+    @State private var opponentProductId = ""
+    @State private var errorMessage: String?
+    @State private var isCreating = false
+
+    private var mine: [Product] { store.products.filter { $0.status == .published } }
+    private var opponents: [Product] { store.friends.flatMap(\.products) }
+
+    var body: some View {
+        Form {
+            Section("Your product") {
+                if mine.isEmpty {
+                    Text("Publish a ready design from Library first.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Product", selection: $productId) {
+                        Text("Choose").tag("")
+                        ForEach(mine) { Text($0.name).tag($0.id) }
+                    }
+                }
+            }
+            Section("Friend's product") {
+                if opponents.isEmpty {
+                    Text("Open another creator's product in the storefront and connect first.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    Picker("Opponent", selection: $opponentProductId) {
+                        Text("Choose").tag("")
+                        ForEach(opponents) { Text("\($0.name) · \($0.creatorName)").tag($0.id) }
+                    }
+                }
+            }
+            Section {
+                Button("Create 24-hour duel") {
+                    isCreating = true
+                    Task {
+                        do {
+                            _ = try await store.createDuel(productId: productId, opponentProductId: opponentProductId)
+                            dismiss()
+                        } catch {
+                            errorMessage = error.localizedDescription
+                        }
+                        isCreating = false
+                    }
+                }
+                .disabled(productId.isEmpty || opponentProductId.isEmpty || isCreating)
+            } footer: {
+                Text("Sales decide the winner. Friends can back either side with demo credits.")
+            }
+        }
+        .navigationTitle("New duel")
+        .errorAlert("Couldn't create the duel", message: $errorMessage)
     }
 }
 

@@ -62,7 +62,7 @@ file storage, mutations (`convex/generation.ts`, `convex/lib/stl.ts`,
 
 ### 2026-11-15 - working tree
 Added a live creator storefront and the two-device commerce loop. A creator can
-publish a ready design; another device can open it in Shop and create a one-time
+publish a ready design; another device can open it from Arena and create a one-time
 Whop sandbox checkout. The signed payment webhook applies a sale idempotently,
 increments the duel, and updates creator earnings. Without a Whop key, checkout
 uses an explicit demo payment so the judge flow stays runnable. Orders subscribe
@@ -72,4 +72,8 @@ The complete no-key flow was exercised on the dev deployment with separate
 seller and buyer device IDs. Convex features: queries, mutations, actions, HTTP
 actions, realtime queries (`convex/products.ts`, `convex/orders.ts`,
 `convex/whop.ts`, `convex/http.ts`, `Melt/StorefrontView.swift`,
-`Melt/LibraryView.swift`).
+`Melt/LibraryView.swift`). Added instant mutual creator connections and a
+new-duel form that pairs published products only after their creators connect.
+The resulting 24-hour duel streams to both devices, accepts demo-credit backing,
+and gains sales when either product is purchased (`convex/friends.ts`,
+`convex/duels.ts`, `Melt/ArenaView.swift`).

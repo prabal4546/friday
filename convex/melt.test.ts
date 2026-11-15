@@ -139,6 +139,26 @@ test("publish, demo checkout, creator earnings, and draft fulfillment work witho
   await t.mutation(api.products.publish, { deviceId: "phone-1", productId: rocket._id, priceCents: 2000 });
   expect((await t.query(api.products.storefront, {})).some((product) => product._id === rocket._id)).toBe(true);
 
+  const buyerProductId = await t.mutation(api.products.create, {
+    deviceId: "phone-2",
+    prompt: "A judge's tiny trophy",
+    filament: "sunflower",
+  });
+  await t.mutation(internal.products.finishStandIn, { productId: buyerProductId });
+  await t.mutation(api.products.publish, { deviceId: "phone-2", productId: buyerProductId, priceCents: 1200 });
+  const buyer = (await t.query(api.profiles.me, { deviceId: "phone-2" }))!;
+  await t.mutation(api.friends.connect, { deviceId: "phone-1", profileId: buyer._id });
+  const buyerFriend = (await t.query(api.friends.list, { deviceId: "phone-1" })).find(
+    (friend) => friend.profileId === buyer._id,
+  )!;
+  expect(buyerFriend.products[0]._id).toBe(buyerProductId);
+  const duelId = await t.mutation(api.duels.challenge, {
+    deviceId: "phone-1",
+    productId: rocket._id,
+    opponentProductId: buyerProductId,
+  });
+  await t.mutation(api.stakes.place, { deviceId: "phone-2", duelId, side: "b", amount: 100 });
+
   const checkout = await t.action(api.whop.createCheckout, { deviceId: "phone-2", productId: rocket._id });
   expect(checkout).toMatchObject({ demo: true, purchaseUrl: null });
   expect((await t.query(api.orders.mine, { deviceId: "phone-2" }))[0]).toMatchObject({
@@ -147,6 +167,7 @@ test("publish, demo checkout, creator earnings, and draft fulfillment work witho
     fulfillment: "queued",
   });
   expect((await t.query(api.profiles.me, { deviceId: "phone-1" }))!.earningsCents).toBe(59950 + 1480);
+  expect((await t.query(api.duels.get, { duelId }))!.salesA).toBe(1);
 
   expect(
     await t.mutation(api.orders.advanceFulfillment, { deviceId: "phone-1", orderId: checkout.orderId }),

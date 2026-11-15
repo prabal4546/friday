@@ -17,6 +17,7 @@ final class MeltStore: ObservableObject {
     @Published private(set) var liveDuels: [Duel] = []
     @Published private(set) var settledDuels: [Duel] = []
     @Published private(set) var stakes: [Stake] = []
+    @Published private(set) var friends: [Friend] = []
     @Published private(set) var orders: [Order] = []
     @Published private(set) var sales: [Order] = []
 
@@ -42,7 +43,7 @@ final class MeltStore: ObservableObject {
             phase = .failed(Self.message(for: error))
             return
         }
-        awaited = ["profiles:me", "duels:live", "products:mine", "products:storefront", "orders:mine", "orders:sales"]
+        awaited = ["profiles:me", "duels:live", "products:mine", "products:storefront", "friends:list", "orders:mine", "orders:sales"]
         let mine: [String: ConvexEncodable?] = ["deviceId": deviceId]
         watch("profiles:me", with: mine) { [weak self] (record: ProfileRecord?) in
             self?.profile = record?.profile
@@ -61,6 +62,9 @@ final class MeltStore: ObservableObject {
         }
         watch("stakes:mine", with: mine) { [weak self] (records: [StakeRecord]) in
             self?.stakes = records.compactMap(\.stake)
+        }
+        watch("friends:list", with: mine) { [weak self] (records: [FriendRecord]) in
+            self?.friends = records.map(\.friend)
         }
         watch("orders:mine", with: mine) { [weak self] (records: [OrderRecord]) in
             self?.orders = records.map(\.order)
@@ -81,6 +85,10 @@ final class MeltStore: ObservableObject {
 
     func stake(for duelId: String) -> Stake? {
         stakes.first { $0.duelId == duelId }
+    }
+
+    func isFriend(profileId: String) -> Bool {
+        friends.contains { $0.id == profileId }
     }
 
     func placeStake(_ amount: Int, on side: Side, duelId: String) async throws {
@@ -192,6 +200,46 @@ final class MeltStore: ObservableObject {
         }
     }
 
+    func connect(profileId: String) async throws {
+        if scenario != nil {
+            guard !isFriend(profileId: profileId),
+                  let product = storefront.first(where: { $0.creatorId == profileId }) else { return }
+            friends.append(Friend(id: profileId, displayName: product.creatorName, products: [product]))
+            return
+        }
+        do {
+            let _: String = try await client.mutation(
+                "friends:connect", with: ["deviceId": deviceId, "profileId": profileId]
+            )
+        } catch {
+            throw MeltError(Self.message(for: error))
+        }
+    }
+
+    func createDuel(productId: String, opponentProductId: String) async throws -> String {
+        if scenario != nil {
+            guard let mine = products.first(where: { $0.id == productId }),
+                  let theirs = storefront.first(where: { $0.id == opponentProductId }) else {
+                throw MeltError("Pick two published products")
+            }
+            let duel = Duel(
+                id: "local-\(UUID().uuidString)", productA: mine, productB: theirs,
+                theme: "New challenge", endsAt: .now.addingTimeInterval(24 * 3600),
+                isLive: true, salesA: 0, salesB: 0, poolA: 0, poolB: 0
+            )
+            liveDuels.insert(duel, at: 0)
+            return duel.id
+        }
+        do {
+            return try await client.mutation(
+                "duels:challenge",
+                with: ["deviceId": deviceId, "productId": productId, "opponentProductId": opponentProductId]
+            )
+        } catch {
+            throw MeltError(Self.message(for: error))
+        }
+    }
+
     private func ensureProfile() async throws {
         let client = client
         let deviceId = deviceId
@@ -263,6 +311,7 @@ final class MeltStore: ObservableObject {
         liveDuels = world.liveDuels
         settledDuels = world.settledDuels
         stakes = world.stakes
+        friends = world.friends
         orders = world.orders
         sales = world.sales
         phase = .ready

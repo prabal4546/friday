@@ -112,3 +112,16 @@ struct CheckoutRecord: Decodable {
     let purchaseUrl: String?
     let demo: Bool
 }
+
+struct FriendRecord: Decodable {
+    let profileId: String
+    let displayName: String
+    let products: [ProductRecord]
+
+    var friend: Friend {
+        Friend(
+            id: profileId, displayName: displayName,
+            products: products.map { $0.product(creatorName: displayName) }
+        )
+    }
+}

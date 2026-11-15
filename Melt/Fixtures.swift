@@ -12,6 +12,7 @@ enum Fixtures {
         var liveDuels: [Duel] = []
         var settledDuels: [Duel] = []
         var stakes: [Stake] = []
+        var friends: [Friend] = []
         var orders: [Order] = []
         var sales: [Order] = []
     }
@@ -95,6 +96,10 @@ enum Fixtures {
             stakes: [
                 Stake(duelId: "settled-1", side: .a, amount: 200, payout: 340),
                 Stake(duelId: "settled-2", side: .a, amount: 100, payout: 0),
+            ],
+            friends: [
+                Friend(id: "Priya Raman", displayName: "Priya Raman", products: [ghost]),
+                Friend(id: "Tomás Herrera", displayName: "Tomás Herrera", products: [fox]),
             ],
             orders: [
                 Order(

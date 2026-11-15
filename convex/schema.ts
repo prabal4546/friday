@@ -12,6 +12,14 @@ export default defineSchema({
     earningsCents: v.number(),
   }).index("by_deviceId", ["deviceId"]),
 
+  friendships: defineTable({
+    profileAId: v.id("profiles"),
+    profileBId: v.id("profiles"),
+  })
+    .index("by_pair", ["profileAId", "profileBId"])
+    .index("by_profileA", ["profileAId"])
+    .index("by_profileB", ["profileBId"]),
+
   products: defineTable({
     creatorId: v.id("profiles"),
     name: v.string(),

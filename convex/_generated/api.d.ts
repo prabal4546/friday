@@ -9,6 +9,7 @@
  */
 
 import type * as duels from "../duels.js";
+import type * as friends from "../friends.js";
 import type * as generation from "../generation.js";
 import type * as http from "../http.js";
 import type * as lib_standardWebhooks from "../lib/standardWebhooks.js";
@@ -28,6 +29,7 @@ import type {
 
 declare const fullApi: ApiFromModules<{
   duels: typeof duels;
+  friends: typeof friends;
   generation: typeof generation;
   http: typeof http;
   "lib/standardWebhooks": typeof lib_standardWebhooks;

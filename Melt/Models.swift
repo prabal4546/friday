@@ -85,6 +85,12 @@ struct Stake: Hashable {
     var payout: Int?
 }
 
+struct Friend: Identifiable, Hashable {
+    let id: String
+    var displayName: String
+    var products: [Product]
+}
+
 struct Order: Identifiable, Hashable {
     enum PaymentStatus: String {
         case pending, paid, failed

@@ -36,6 +36,23 @@ struct ProductDetailView: View {
                         .disabled(isWorking)
                     }
                 } else if product.status == .published, product.creatorId != store.profile?.id {
+                    if !store.isFriend(profileId: product.creatorId) {
+                        Section("Creator") {
+                            Button("Connect with \(product.creatorName)") {
+                                isWorking = true
+                                Task {
+                                    do {
+                                        try await store.connect(profileId: product.creatorId)
+                                        commerceMessage = "Connected. You can now challenge this creator."
+                                    } catch {
+                                        errorMessage = error.localizedDescription
+                                    }
+                                    isWorking = false
+                                }
+                            }
+                            .disabled(isWorking)
+                        }
+                    }
                     Section("Order") {
                         Button("Buy for \(dollars(product.priceCents))") {
                             isWorking = true

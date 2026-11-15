@@ -17,6 +17,12 @@ async function seedWorld(ctx: MutationCtx) {
     const wen = await profile("seed:wen", "Wen Liu", 1, 22890);
     const aoife = await profile("seed:aoife", "Aoife Byrne", 0, 0);
     const kwame = await profile("seed:kwame", "Kwame Mensah", 0, 0);
+    const friendship = async (left: Id<"profiles">, right: Id<"profiles">) => {
+      const [profileAId, profileBId] = left < right ? [left, right] : [right, left];
+      await ctx.db.insert("friendships", { profileAId, profileBId });
+    };
+    await friendship(you, priya);
+    await friendship(you, tomas);
 
     const published = (
       creatorId: Id<"profiles">,
@@ -175,7 +181,7 @@ export const run = internalMutation({
 export const reset = internalMutation({
   args: {},
   handler: async (ctx) => {
-    for (const table of ["transactions", "orders", "stakes", "duels", "products", "profiles"] as const) {
+    for (const table of ["transactions", "orders", "stakes", "duels", "friendships", "products", "profiles"] as const) {
       for (const doc of await ctx.db.query(table).take(1000)) await ctx.db.delete(doc._id);
     }
     await seedWorld(ctx);
