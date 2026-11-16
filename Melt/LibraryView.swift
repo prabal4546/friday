@@ -9,6 +9,8 @@ struct LibraryView: View {
 
     @EnvironmentObject private var store: MeltStore
     @State private var filter = Filter.all
+    @State private var displayName = ""
+    @State private var profileError: String?
 
     private var visibleProducts: [Product] {
         switch filter {
@@ -24,6 +26,17 @@ struct LibraryView: View {
                 List {
                     if let profile = store.profile {
                         Section(profile.displayName) {
+                            TextField("Creator name", text: $displayName)
+                            Button("Save creator name") {
+                                Task {
+                                    do {
+                                        try await store.renameProfile(displayName)
+                                    } catch {
+                                        profileError = error.localizedDescription
+                                    }
+                                }
+                            }
+                            .disabled(displayName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || displayName == profile.displayName)
                             LabeledContent("Credits", value: profile.credits.formatted())
                             LabeledContent("Duel wins", value: "\(profile.wins)")
                             LabeledContent("Earnings", value: dollars(profile.earningsCents))
@@ -72,6 +85,10 @@ struct LibraryView: View {
                 }
             }
             .navigationTitle("Library")
+            .task(id: store.profile?.displayName) {
+                displayName = store.profile?.displayName ?? ""
+            }
+            .errorAlert("Couldn't change your name", message: $profileError)
         }
     }
 }

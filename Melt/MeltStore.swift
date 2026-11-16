@@ -106,6 +106,20 @@ final class MeltStore: ObservableObject {
         }
     }
 
+    func renameProfile(_ displayName: String) async throws {
+        if scenario != nil {
+            profile?.displayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return
+        }
+        do {
+            try await client.mutation(
+                "profiles:rename", with: ["deviceId": deviceId, "displayName": displayName]
+            )
+        } catch {
+            throw MeltError(Self.message(for: error))
+        }
+    }
+
     func generate(prompt: String, filament: Filament) async throws -> String {
         if scenario != nil {
             return generateFixture(prompt: prompt, filament: filament)
