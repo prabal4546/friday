@@ -1,14 +1,23 @@
 import { ConvexError, v } from "convex/values";
 import type { Doc, Id } from "./_generated/dataModel";
-import { internalMutation, mutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { internalMutation, query, type MutationCtx, type QueryCtx } from "./_generated/server";
 import { liveDuelFor } from "./duels";
 import { profileByDevice, requireProfile } from "./profiles";
+import schema from "./schema";
 
-async function insertPending(ctx: MutationCtx, deviceId: string, productId: Id<"products">) {
+const orderSummary = v.object({
+  _id: v.id("orders"), productId: v.id("products"), productName: v.string(), buyerName: v.string(), creatorName: v.string(),
+  filament: v.string(), amountCents: v.number(), status: v.union(v.literal("pending"), v.literal("paid"), v.literal("failed")),
+  fulfillment: v.union(v.literal("none"), v.literal("queued"), v.literal("submitted"), v.literal("printing")),
+  purchaseUrl: v.optional(v.string()), paidAt: v.optional(v.number()), slantOrderId: v.optional(v.string()), slantQuoteCents: v.optional(v.number()),
+});
+
+async function insertPending(ctx: MutationCtx, deviceId: string, productId: Id<"products">, whopAccountId?: string) {
   const buyer = await requireProfile(ctx, deviceId);
   const product = await ctx.db.get(productId);
-  if (product === null || product.status !== "published") throw new ConvexError("This product is not for sale");
-  if (product.creatorId === buyer._id) throw new ConvexError("You already own this design");
+  if (product === null || (product.status !== "published" && !(product.status === "ready" && product.creatorId === buyer._id))) {
+    throw new ConvexError("This design is not available to order");
+  }
   const orderId = await ctx.db.insert("orders", {
     productId: product._id,
     buyerId: buyer._id,
@@ -17,12 +26,13 @@ async function insertPending(ctx: MutationCtx, deviceId: string, productId: Id<"
     amountCents: product.priceCents,
     status: "pending",
     fulfillment: "none",
+    whopAccountId,
   });
   return { orderId, product };
 }
 
 async function applyPayment(ctx: MutationCtx, order: Doc<"orders">, whopPaymentId: string) {
-  if (order.status !== "pending") return "duplicate" as const;
+  if (order.status === "paid") return "duplicate" as const;
   const now = Date.now();
   await ctx.db.patch(order._id, {
     status: "paid",
@@ -30,6 +40,8 @@ async function applyPayment(ctx: MutationCtx, order: Doc<"orders">, whopPaymentI
     whopPaymentId,
     paidAt: now,
   });
+  // A personal print is an order, not a marketplace sale or a competition score.
+  if (order.buyerId === order.creatorId) return "paid" as const;
   const product = await ctx.db.get(order.productId);
   if (product !== null) await ctx.db.patch(product._id, { salesCount: product.salesCount + 1 });
   const earned = order.amountCents - (product?.printCostCents ?? 0);
@@ -78,15 +90,17 @@ async function summary(ctx: QueryCtx, order: Doc<"orders">) {
 }
 
 export const createPending = internalMutation({
-  args: { deviceId: v.string(), productId: v.id("products") },
+  args: { deviceId: v.string(), productId: v.id("products"), whopAccountId: v.optional(v.string()) },
+  returns: v.object({ orderId: v.id("orders"), creatorId: v.id("profiles"), productName: v.string(), amountCents: v.number() }),
   handler: async (ctx, args) => {
-    const { orderId, product } = await insertPending(ctx, args.deviceId, args.productId);
+    const { orderId, product } = await insertPending(ctx, args.deviceId, args.productId, args.whopAccountId);
     return { orderId, creatorId: product.creatorId, productName: product.name, amountCents: product.priceCents };
   },
 });
 
 export const createDemoPaid = internalMutation({
   args: { deviceId: v.string(), productId: v.id("products") },
+  returns: v.id("orders"),
   handler: async (ctx, args) => {
     const { orderId } = await insertPending(ctx, args.deviceId, args.productId);
     const order = await ctx.db.get(orderId);
@@ -97,6 +111,7 @@ export const createDemoPaid = internalMutation({
 
 export const attachCheckout = internalMutation({
   args: { orderId: v.id("orders"), whopCheckoutId: v.string(), purchaseUrl: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     await ctx.db.patch(args.orderId, { whopCheckoutId: args.whopCheckoutId, purchaseUrl: args.purchaseUrl });
   },
@@ -104,6 +119,7 @@ export const attachCheckout = internalMutation({
 
 export const markFailed = internalMutation({
   args: { orderId: v.id("orders"), reason: v.string() },
+  returns: v.null(),
   handler: async (ctx, args) => {
     const order = await ctx.db.get(args.orderId);
     if (order !== null && order.status === "pending") {
@@ -117,7 +133,9 @@ export const markPaid = internalMutation({
     whopPaymentId: v.string(),
     orderId: v.optional(v.string()),
     whopCheckoutId: v.optional(v.string()),
+    accountId: v.optional(v.string()),
   },
+  returns: v.union(v.literal("duplicate"), v.literal("unknown_order"), v.literal("paid")),
   handler: async (ctx, args) => {
     const seen = await ctx.db
       .query("orders")
@@ -133,12 +151,15 @@ export const markPaid = internalMutation({
         .first();
     }
     if (order === null) return "unknown_order" as const;
+    if (order.whopAccountId && order.whopAccountId !== args.accountId) throw new ConvexError("Payment account does not match this order");
+    if (order.whopCheckoutId && args.whopCheckoutId && order.whopCheckoutId !== args.whopCheckoutId) throw new ConvexError("Payment checkout does not match this order");
     return await applyPayment(ctx, order, args.whopPaymentId);
   },
 });
 
-export const advanceFulfillment = mutation({
+export const advanceFulfillment = internalMutation({
   args: { deviceId: v.string(), orderId: v.id("orders") },
+  returns: v.union(v.literal("none"), v.literal("queued"), v.literal("submitted"), v.literal("printing")),
   handler: async (ctx, args) => {
     const creator = await requireProfile(ctx, args.deviceId);
     const order = await ctx.db.get(args.orderId);
@@ -164,6 +185,7 @@ export const advanceFulfillment = mutation({
 
 export const mine = query({
   args: { deviceId: v.string() },
+  returns: v.array(orderSummary),
   handler: async (ctx, args) => {
     const profile = await profileByDevice(ctx, args.deviceId);
     if (profile === null) return [];
@@ -178,6 +200,7 @@ export const mine = query({
 
 export const sales = query({
   args: { deviceId: v.string() },
+  returns: v.array(orderSummary),
   handler: async (ctx, args) => {
     const profile = await profileByDevice(ctx, args.deviceId);
     if (profile === null) return [];
@@ -186,11 +209,12 @@ export const sales = query({
       .withIndex("by_creator", (q) => q.eq("creatorId", profile._id))
       .order("desc")
       .take(50);
-    return await Promise.all(orders.map((order) => summary(ctx, order)));
+    return await Promise.all(orders.filter((order) => order.buyerId !== order.creatorId).map((order) => summary(ctx, order)));
   },
 });
 
 export const get = query({
   args: { orderId: v.id("orders") },
+  returns: v.union(schema.doc("orders"), v.null()),
   handler: async (ctx, args) => await ctx.db.get(args.orderId),
 });

@@ -1,277 +1,227 @@
-import Combine
-import RealityKit
 import SwiftUI
 
 struct ProductDetailView: View {
     @EnvironmentObject private var store: MeltStore
-    @Environment(\.openURL) private var openURL
+    @Environment(\.dismiss) private var dismiss
     let productId: String
+    var initialAction = ProductDestination.Action.view
     @State private var errorMessage: String?
-    @State private var commerceMessage: String?
+    @State private var showsOrder = false
+    @State private var showsPublish = false
+    @State private var handledInitialAction = false
     @State private var isWorking = false
 
     var body: some View {
-        if let product = store.product(id: productId) {
-            List {
-                Section {
-                    ModelPreview(product: product)
-                        .frame(height: 300)
-                        .listRowInsets(EdgeInsets())
-                }
-                if product.status == .ready, product.creatorId == store.profile?.id {
-                    Section("Sell this design") {
-                        LabeledContent("Storefront price", value: dollars(product.priceCents))
-                        Button("Publish for \(dollars(product.priceCents))") {
-                            isWorking = true
-                            Task {
-                                do {
-                                    try await store.publish(productId: product.id, priceCents: product.priceCents)
-                                    commerceMessage = "Published. This design is now in the Shop."
-                                } catch {
-                                    errorMessage = error.localizedDescription
+        Group {
+            if let product = store.product(id: productId) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 22) {
+                        StudioHeading(title: product.name)
+                        ModelPreview(product: product).frame(height: 330)
+                        if product.creatorId == store.profile?.id && product.status == .ready {
+                            FilamentPicker(selection: Binding(get: { product.filament }, set: { color in
+                                run { try await store.setFilament(color, productId: product.id) }
+                            }), originalSelected: product.hasOriginalAppearance && product.colorCustomized != true,
+                            reset: !product.hasOriginalAppearance ? nil : { run { try await store.resetAppearance(productId: product.id) } })
+                            .disabled(isWorking)
+                        } else {
+                            HStack { Text("COLOR"); Spacer(); Text(product.filament.label) }.font(Studio.label)
+                        }
+                        if product.status == .ready && product.creatorId == store.profile?.id || product.status == .published {
+                            Button { showsOrder = true } label: {
+                                HStack { Text("Order"); Spacer(); Text(dollars(product.priceCents)); Image(systemName: "arrow.up.right") }.padding(.horizontal, 18)
+                            }.buttonStyle(StudioButton()).disabled(isWorking)
+                        }
+                        if product.creatorId == store.profile?.id {
+                            HStack {
+                                if product.status == .ready || product.status == .published {
+                                    Button(product.whopListingURL == nil ? "Publish to Whop" : "View listing", systemImage: "square.and.arrow.up") { showsPublish = true }
+                                    Spacer()
                                 }
-                                isWorking = false
+                                if product.status != .published {
+                                    Button(product.status == .failed ? "Retry" : "Edit", systemImage: "slider.horizontal.3") {
+                                        store.edit(product)
+                                        dismiss()
+                                    }
+                                }
+                            }.font(.headline).buttonStyle(.plain)
+                        } else {
+                            HStack {
+                                Text(product.creatorName).font(.subheadline.bold())
+                                Spacer()
+                                if store.isFriend(profileId: product.creatorId) {
+                                    Label("Connected", systemImage: "checkmark").font(.caption)
+                                } else {
+                                    Button("Connect") { run { try await store.connect(profileId: product.creatorId) } }
+                                        .font(.subheadline.bold()).disabled(isWorking)
+                                }
                             }
                         }
-                        .disabled(isWorking)
-                    }
-                } else if product.status == .published, product.creatorId != store.profile?.id {
-                    if !store.isFriend(profileId: product.creatorId) {
-                        Section("Creator") {
-                            Button("Connect with \(product.creatorName)") {
+                        StudioRule()
+                        HStack {
+                            Text(product.status.label.uppercased()).font(Studio.label)
+                            Spacer()
+                            if product.status == .published { Text("\(product.salesCount) sold").font(Studio.label) }
+                        }
+                        if let note = product.printNote {
+                            Label(note, systemImage: "exclamationmark.circle").font(.subheadline).foregroundStyle(Studio.muted)
+                        }
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("PROMPT").font(Studio.label).foregroundStyle(Studio.muted)
+                            Text(product.prompt).font(.system(.body, design: .monospaced))
+                        }
+                    }.padding(24)
+                }
+                .sheet(isPresented: $showsOrder) { OrderReviewView(productId: productId) }
+                .sheet(isPresented: $showsPublish) { PublishView(productId: productId) }
+            } else {
+                if store.phase == .ready {
+                    StudioEmpty(title: "Loading design", detail: "Your design will appear here shortly.")
+                } else { ProgressView() }
+            }
+        }
+        .studioScreen()
+        .navigationTitle("Design").navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+        .task(id: store.product(id: productId)?.id) {
+            guard store.product(id: productId) != nil, !handledInitialAction else { return }
+            handledInitialAction = true
+            showsOrder = initialAction == .order
+            showsPublish = initialAction == .publish
+        }
+        .errorAlert("Couldn't complete that action", message: $errorMessage)
+    }
+
+    private func run(_ action: @escaping () async throws -> Void) {
+        isWorking = true
+        Task {
+            defer { isWorking = false }
+            do { try await action() } catch { errorMessage = error.localizedDescription }
+        }
+    }
+}
+
+struct OrderReviewView: View {
+    @EnvironmentObject private var store: MeltStore
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.openURL) private var openURL
+    let productId: String
+    @State private var result: CheckoutResult?
+    @State private var isWorking = false
+    @State private var errorMessage: String?
+
+    private var order: Order? { store.orders.first { $0.id == result?.orderId } }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    if let product = store.product(id: productId) {
+                        ProductArtwork(product: product).frame(height: 240)
+                        StudioHeading(title: product.name, subtitle: product.filament.label)
+                        StudioRule()
+                        HStack { Text("Price"); Spacer(); Text(dollars(product.priceCents)).bold() }
+                        if let result {
+                            if let order {
+                                OrderRow(order: order, role: .buyer)
+                            } else { ProgressView("Waiting for payment") }
+                            if order?.status != .paid, let url = result.purchaseURL {
+                                Button("Continue checkout") { openURL(url) }.buttonStyle(StudioButton())
+                            }
+                            Button("View orders") {
+                                store.shelfSection = .orders
+                                store.selectedTab = .shelf
+                                dismiss()
+                            }.buttonStyle(StudioButton(secondary: true))
+                        } else {
+                            Button {
                                 isWorking = true
                                 Task {
+                                    defer { isWorking = false }
                                     do {
-                                        try await store.connect(profileId: product.creatorId)
-                                        commerceMessage = "Connected. You can now challenge this creator."
-                                    } catch {
-                                        errorMessage = error.localizedDescription
-                                    }
-                                    isWorking = false
+                                        result = try await store.checkout(productId: productId)
+                                        if let url = result?.purchaseURL { openURL(url) }
+                                    } catch { errorMessage = error.localizedDescription }
                                 }
-                            }
-                            .disabled(isWorking)
+                            } label: {
+                                HStack { Text(isWorking ? "Preparing checkout" : "Continue to checkout"); Image(systemName: "arrow.up.right") }
+                            }.buttonStyle(StudioButton()).disabled(isWorking)
                         }
                     }
-                    Section("Order") {
-                        Button("Buy for \(dollars(product.priceCents))") {
-                            isWorking = true
-                            Task {
-                                do {
-                                    if let checkout = try await store.checkout(productId: product.id) {
-                                        openURL(checkout)
-                                    } else {
-                                        commerceMessage = "Demo payment complete. Your order is now Paid."
-                                    }
-                                } catch {
-                                    errorMessage = error.localizedDescription
-                                }
-                                isWorking = false
+                }.padding(24)
+            }.studioScreen().navigationTitle("Order").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+                .errorAlert("Couldn't open checkout", message: $errorMessage)
+        }.tint(Studio.orange)
+    }
+}
+
+struct PublishView: View {
+    @Environment(\.openURL) private var openURL
+    @EnvironmentObject private var store: MeltStore
+    @Environment(\.dismiss) private var dismiss
+    let productId: String
+    @State private var price = ""
+    @State private var isWorking = false
+    @State private var published = false
+    @State private var listingURL: URL?
+    @State private var errorMessage: String?
+
+    private var cents: Int? {
+        guard price.range(of: "^[0-9]+([.,][0-9]{0,2})?$", options: .regularExpression) != nil,
+              let value = Decimal(string: price.replacingOccurrences(of: ",", with: ".")), value >= 5, value <= 500 else { return nil }
+        let scaled = value * 100
+        let number = NSDecimalNumber(decimal: scaled)
+        guard number.decimalValue == Decimal(number.intValue) else { return nil }
+        return number.intValue
+    }
+
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 24) {
+                    if let product = store.product(id: productId) {
+                        ProductArtwork(product: product).frame(height: 260)
+                        StudioHeading(title: product.name)
+                        if published || product.whopListingURL != nil {
+                            Label("Published", systemImage: "checkmark.circle.fill").font(.title2.bold())
+                            Text("Your design is listed in \(store.whopStore?.name ?? "your Whop store").").foregroundStyle(Studio.muted)
+                            if let url = listingURL ?? product.whopListingURL {
+                                Button("View on Whop") { openURL(url) }.buttonStyle(StudioButton())
                             }
-                        }
-                        .disabled(isWorking)
-                        if isWorking { ProgressView("Preparing checkout") }
-                    }
-                }
-                if let commerceMessage {
-                    Section {
-                        Label(commerceMessage, systemImage: "checkmark.circle.fill")
-                            .foregroundStyle(.green)
-                    }
-                }
-                if product.status == .ready, product.creatorId == store.profile?.id {
-                    Section("Filament") {
-                        FilamentPicker(
-                            selection: Binding(
-                                get: { product.filament },
-                                set: { filament in
-                                    Task {
-                                        do {
-                                            try await store.setFilament(filament, productId: product.id)
-                                        } catch {
-                                            errorMessage = error.localizedDescription
-                                        }
-                                    }
+                            Button("Done") { dismiss() }.buttonStyle(StudioButton())
+                        } else {
+                            StudioRule()
+                            if let whopStore = store.whopStore {
+                                Label(whopStore.name, systemImage: "storefront").font(.headline)
+                            } else if store.whopStoreLoaded {
+                                Text("Your demo Whop store has not been assigned yet. Ask the demo organizer to set it up.").foregroundStyle(Studio.muted)
+                                Text("Profile: \(store.profile?.id ?? "")").font(.caption).textSelection(.enabled)
+                            } else {
+                                ProgressView("Loading your store")
+                            }
+                            Text("PRICE / USD").font(Studio.label)
+                            HStack {
+                                Text("$")
+                                TextField("15.00", text: $price).keyboardType(.decimalPad).accessibilityIdentifier("listing-price").disabled(isWorking || product.whopPublishPriceCents != nil)
+                            }.font(Studio.title(32))
+                            Text("$5–$500").font(.caption).foregroundStyle(Studio.muted)
+                            Button(isWorking ? "Publishing to Whop…" : "Publish") {
+                                guard let cents else { return }
+                                isWorking = true
+                                Task {
+                                    defer { isWorking = false }
+                                    do { listingURL = try await store.publish(productId: productId, priceCents: cents); published = true }
+                                    catch { errorMessage = error.localizedDescription }
                                 }
-                            )
-                        )
+                            }.buttonStyle(StudioButton()).disabled(cents == nil || isWorking || store.whopStore == nil)
+                        }
                     }
-                }
-                Section {
-                    LabeledContent("Creator", value: product.creatorName)
-                    LabeledContent("Price", value: dollars(product.priceCents))
-                    LabeledContent("Filament", value: product.filament.label)
-                    LabeledContent("Status", value: product.status.label)
-                    LabeledContent("Sold", value: "\(product.salesCount)")
-                }
-                if let printNote = product.printNote {
-                    Section("Printability") {
-                        Label(printNote, systemImage: "exclamationmark.triangle")
-                    }
-                }
-                Section("Prompt") {
-                    Text(product.prompt)
-                }
-            }
-            .navigationTitle(product.name)
-            .navigationBarTitleDisplayMode(.inline)
-            .errorAlert("Couldn't complete that action", message: $errorMessage)
-        } else {
-            ContentUnavailableView("This product is gone", systemImage: "questionmark.circle")
-        }
+                }.padding(24)
+            }.studioScreen().navigationTitle("Publish").navigationBarTitleDisplayMode(.inline)
+                .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Close") { dismiss() } } }
+                .task { if let product = store.product(id: productId) { price = String(format: "%.2f", Double(product.whopPublishPriceCents ?? product.priceCents) / 100) } }
+                .errorAlert("Couldn't publish", message: $errorMessage)
+        }.tint(Studio.orange)
     }
-}
-
-struct ModelPreview: View {
-    let product: Product
-
-    var body: some View {
-        switch product.status {
-        case .generating:
-            ProgressView("Generating the model. This can take a few minutes.")
-                .frame(maxWidth: .infinity)
-        case .failed:
-            ContentUnavailableView(
-                "No model",
-                systemImage: "cube.transparent",
-                description: Text(product.failureReason ?? "Generation failed")
-            )
-        case .ready, .published:
-            ModelStage(product: product)
-        }
-    }
-}
-
-private struct ModelStage: View {
-    let product: Product
-    @State private var pivot = Entity()
-    @State private var note: String?
-    @State private var isLoading = false
-    @State private var isSpinning = true
-    private let frames = Timer.publish(every: 1.0 / 30, on: .main, in: .common).autoconnect()
-
-    var body: some View {
-        RealityView { content in
-            content.camera = .virtual
-            content.add(pivot)
-            let light = DirectionalLight()
-            light.light.intensity = 2500
-            light.look(at: .zero, from: [1, 2, 2], relativeTo: nil)
-            content.add(light)
-        }
-        .realityViewCameraControls(.orbit)
-        .accessibilityLabel("3D preview of \(product.name)")
-        .overlay {
-            if isLoading {
-                ProgressView("Loading the model")
-            }
-        }
-        .overlay(alignment: .bottom) {
-            HStack {
-                if let note {
-                    Text(note)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Button(isSpinning ? "Pause" : "Spin", systemImage: isSpinning ? "pause.fill" : "arrow.triangle.2.circlepath") {
-                    isSpinning.toggle()
-                }
-                .buttonStyle(.bordered)
-            }
-            .padding(12)
-        }
-        .task(id: product.usdzURL) {
-            await showModel()
-        }
-        .onChange(of: product.filament) {
-            applyFilament(product.filament, to: pivot)
-        }
-        .onReceive(frames) { _ in
-            if isSpinning {
-                pivot.transform.rotation *= simd_quatf(angle: .pi / 180, axis: [0, 1, 0])
-            }
-        }
-    }
-
-    private func showModel() async {
-        var model = fixtureModel(for: product)
-        note = "Stand-in shape"
-        if let remote = product.usdzURL {
-            isLoading = true
-            do {
-                let file = try await cachedModelFile(for: remote, productId: product.id)
-                do {
-                    model = try await Entity(contentsOf: file)
-                    note = nil
-                } catch {
-                    try? FileManager.default.removeItem(at: file)
-                    throw error
-                }
-            } catch {
-                note = "The model couldn't be loaded. Showing a stand-in shape."
-            }
-            isLoading = false
-        }
-        let bounds = model.visualBounds(relativeTo: nil)
-        let scale = 1.1 / max(bounds.extents.x, bounds.extents.y, bounds.extents.z, .leastNonzeroMagnitude)
-        let fitted = Entity()
-        fitted.addChild(model)
-        fitted.scale = SIMD3(repeating: scale)
-        fitted.position = -bounds.center * scale
-        pivot.children.removeAll()
-        pivot.addChild(fitted)
-        applyFilament(product.filament, to: pivot)
-    }
-}
-
-private func cachedModelFile(for remote: URL, productId: String) async throws -> URL {
-    let folder = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("models", isDirectory: true)
-    let file = folder.appendingPathComponent(productId).appendingPathExtension("usdz")
-    if FileManager.default.fileExists(atPath: file.path) { return file }
-    try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
-    let (downloaded, response) = try await URLSession.shared.download(from: remote)
-    guard (response as? HTTPURLResponse)?.statusCode == 200 else {
-        throw MeltError("The model file couldn't be downloaded")
-    }
-    try FileManager.default.moveItem(at: downloaded, to: file)
-    return file
-}
-
-@MainActor
-private func applyFilament(_ filament: Filament, to entity: Entity) {
-    if var model = entity.components[ModelComponent.self] {
-        let material = SimpleMaterial(color: UIColor(filament.color), roughness: 0.55, isMetallic: false)
-        model.materials = model.materials.map { _ in material }
-        entity.components.set(model)
-    }
-    for child in entity.children {
-        applyFilament(filament, to: child)
-    }
-}
-
-@MainActor
-private func fixtureModel(for product: Product) -> Entity {
-    let root = Entity()
-    func add(_ mesh: MeshResource, at position: SIMD3<Float>) {
-        let part = ModelEntity(mesh: mesh, materials: [SimpleMaterial()])
-        part.position = position
-        root.addChild(part)
-    }
-    switch product.name.utf8.reduce(0, { $0 + Int($1) }) % 3 {
-    case 0:
-        add(.generateSphere(radius: 0.26), at: [0, -0.12, 0])
-        add(.generateSphere(radius: 0.18), at: [0, 0.24, 0])
-        add(.generateCone(height: 0.16, radius: 0.06), at: [-0.1, 0.45, 0])
-        add(.generateCone(height: 0.16, radius: 0.06), at: [0.1, 0.45, 0])
-    case 1:
-        add(.generateCylinder(height: 0.5, radius: 0.22), at: [0, 0, 0])
-        add(.generateCylinder(height: 0.05, radius: 0.27), at: [0, 0.27, 0])
-        add(.generateCylinder(height: 0.05, radius: 0.18), at: [0, -0.27, 0])
-    default:
-        add(.generateBox(size: [0.5, 0.22, 0.5], cornerRadius: 0.04), at: [0, -0.13, 0])
-        add(.generateBox(size: [0.42, 0.22, 0.42], cornerRadius: 0.04), at: [0, 0.11, 0])
-    }
-    return root
 }

@@ -21,6 +21,12 @@ async function seeded() {
   await t.mutation(internal.seed.run, {});
   await t.mutation(api.profiles.ensure, { deviceId: "phone-1", claimSeed: true });
   await t.mutation(api.profiles.ensure, { deviceId: "phone-2", displayName: "Judge" });
+  vi.stubEnv("WHOP_ENVIRONMENT", "sandbox");
+  await t.run(async ctx => {
+    for (const profile of await ctx.db.query("profiles").take(30)) {
+      await ctx.db.insert("whopStores", { profileId: profile._id, accountId: "biz_demo", name: "Demo", apiKeyEnv: "WHOP_API_KEY", webhookSecretEnv: "WHOP_WEBHOOK_SECRET" });
+    }
+  });
   const live = await t.query(api.duels.live, {});
   const foxVsDuck = live.find((duel) => duel.productA.name === "Fox desk buddy")!;
   return { t, live, foxVsDuck };
@@ -112,11 +118,12 @@ test("checkout carries productId, creatorId, and orderId, and a signed payment i
   expect(new Headers(init.headers).get("Idempotency-Key")).toBe(checkout.orderId);
   const sent = JSON.parse(init.body as string);
   expect(sent.metadata).toEqual({ productId: fox._id, creatorId: fox.creatorId, orderId: checkout.orderId });
+  expect(sent.account_id).toBe("biz_demo");
   expect(sent.variant).toMatchObject({ billing_type: "one_time", initial_price: 15, currency: "usd" });
 
   const body = JSON.stringify({
     type: "payment.succeeded",
-    data: { id: "pay_test", checkout_configuration_id: "ch_test", metadata: sent.metadata },
+    data: { id: "pay_test", account_id: "biz_demo", checkout_configuration_id: "ch_test", metadata: sent.metadata },
   });
   expect((await t.fetch("/webhooks/whop", await signedRequest(body, "ws_wrong"))).status).toBe(401);
   expect((await t.query(api.orders.get, { orderId: checkout.orderId }))!.status).toBe("pending");
@@ -140,7 +147,7 @@ test("production Whop checkout remains disabled", async () => {
 
   await expect(
     t.action(api.whop.createCheckout, { deviceId: "phone-2", productId: foxVsDuck.productA._id }),
-  ).rejects.toThrow("Production Whop checkout is disabled");
+  ).rejects.toThrow("Checkout is unavailable");
   expect(fetchMock).not.toHaveBeenCalled();
   expect(await t.query(api.orders.mine, { deviceId: "phone-2" })).toEqual([]);
 });
@@ -153,12 +160,9 @@ test("publish, demo checkout, creator earnings, and draft fulfillment work witho
   await t.mutation(api.products.publish, { deviceId: "phone-1", productId: rocket._id, priceCents: 2000 });
   expect((await t.query(api.products.storefront, {})).some((product) => product._id === rocket._id)).toBe(true);
 
-  const buyerProductId = await t.mutation(api.products.create, {
-    deviceId: "phone-2",
-    prompt: "A judge's tiny trophy",
-    filament: "sunflower",
+  const buyerProductId = await t.mutation(api.products.createStarter, {
+    deviceId: "phone-2", filament: "sunflower",
   });
-  await t.mutation(internal.products.finishStandIn, { productId: buyerProductId });
   await t.mutation(api.products.publish, { deviceId: "phone-2", productId: buyerProductId, priceCents: 1200 });
   const buyer = (await t.query(api.profiles.me, { deviceId: "phone-2" }))!;
   await t.mutation(api.friends.connect, { deviceId: "phone-1", profileId: buyer._id });
@@ -173,8 +177,9 @@ test("publish, demo checkout, creator earnings, and draft fulfillment work witho
   });
   await t.mutation(api.stakes.place, { deviceId: "phone-2", duelId, side: "b", amount: 100 });
 
-  const checkout = await t.action(api.whop.createCheckout, { deviceId: "phone-2", productId: rocket._id });
-  expect(checkout).toMatchObject({ demo: true, purchaseUrl: null });
+  // Simulation is invoked explicitly by this test, never through connected checkout.
+  const orderId = await t.mutation(internal.orders.createDemoPaid, { deviceId: "phone-2", productId: rocket._id });
+  const checkout = { orderId };
   expect((await t.query(api.orders.mine, { deviceId: "phone-2" }))[0]).toMatchObject({
     productName: "Rocket pen cup",
     status: "paid",
@@ -184,13 +189,13 @@ test("publish, demo checkout, creator earnings, and draft fulfillment work witho
   expect((await t.query(api.duels.get, { duelId }))!.salesA).toBe(1);
 
   expect(
-    await t.mutation(api.orders.advanceFulfillment, { deviceId: "phone-1", orderId: checkout.orderId }),
+    await t.mutation(internal.orders.advanceFulfillment, { deviceId: "phone-1", orderId: checkout.orderId }),
   ).toBe("submitted");
   let sale = (await t.query(api.orders.sales, { deviceId: "phone-1" }))[0];
   expect(sale).toMatchObject({ fulfillment: "submitted", slantQuoteCents: 970 });
   expect(sale.slantOrderId).toMatch(/^draft:/);
   expect(
-    await t.mutation(api.orders.advanceFulfillment, { deviceId: "phone-1", orderId: checkout.orderId }),
+    await t.mutation(internal.orders.advanceFulfillment, { deviceId: "phone-1", orderId: checkout.orderId }),
   ).toBe("printing");
   sale = (await t.query(api.orders.sales, { deviceId: "phone-1" }))[0];
   expect(sale.fulfillment).toBe("printing");
@@ -204,19 +209,62 @@ test("publish, demo checkout, creator earnings, and draft fulfillment work witho
   expect(orders.map((order) => order.status).sort()).toEqual(["failed", "paid"]);
 });
 
-test("a new design starts generating and the stand-in turns it into a draft", async () => {
-  vi.useFakeTimers();
+test("generation without credentials fails without inserting a fake design", async () => {
   const { t } = await seeded();
-  const args = { deviceId: "phone-2", prompt: "  A tiny rocket for my desk  ", filament: "lava" };
-  const productId = await t.mutation(api.products.create, args);
-  expect((await t.query(api.products.get, { productId }))!).toMatchObject({
-    status: "generating",
-    name: "A tiny rocket for my desk",
-  });
-  vi.advanceTimersByTime(3001);
-  await t.finishInProgressScheduledFunctions();
-  expect((await t.query(api.products.get, { productId }))!.status).toBe("ready");
+  vi.stubEnv("FAL_KEY", undefined);
+  const args = { deviceId: "phone-2", prompt: "A tiny rocket for my desk", filament: "lava" };
+  await expect(t.mutation(api.products.create, args)).rejects.toThrow("Generation is unavailable");
+  expect(await t.query(api.products.mine, { deviceId: "phone-2" })).toHaveLength(0);
   await expect(t.mutation(api.products.create, { ...args, prompt: "   " })).rejects.toThrow("1 to 400");
+});
+
+test("checkout without credentials never creates a paid or pending order", async () => {
+  const { t, foxVsDuck } = await seeded();
+  vi.stubEnv("WHOP_API_KEY", undefined);
+  await expect(t.action(api.whop.createCheckout, { deviceId: "phone-2", productId: foxVsDuck.productA._id })).rejects.toThrow("Checkout is unavailable");
+  expect(await t.query(api.orders.mine, { deviceId: "phone-2" })).toEqual([]);
+});
+
+test("starter drafts belong to their creator and can be recolored and published", async () => {
+  const { t } = await seeded();
+  const productId = await t.mutation(api.products.createStarter, { deviceId: "phone-2", filament: "bone" });
+  const draft = await t.query(api.products.get, { productId });
+  expect(draft).toMatchObject({ name: "Polka-dot man keychain", starterKey: "polka-man", status: "ready", filament: "bone" });
+  await expect(t.mutation(api.products.setFilament, { deviceId: "phone-1", productId, filament: "sky" })).rejects.toThrow("Only the creator");
+  await t.mutation(api.products.setFilament, { deviceId: "phone-2", productId, filament: "sky" });
+  expect((await t.query(api.products.get, { productId }))!.colorCustomized).toBe(true);
+  await t.mutation(api.products.setFilament, { deviceId: "phone-2", productId, filament: "sky", useOriginal: true });
+  expect((await t.query(api.products.get, { productId }))!.colorCustomized).toBe(false);
+  await expect(t.mutation(api.products.publish, { deviceId: "phone-1", productId, priceCents: 1500 })).rejects.toThrow("Only the creator");
+  await t.mutation(api.products.publish, { deviceId: "phone-2", productId, priceCents: 1200 });
+  expect((await t.query(api.products.storefront, {})).find(p => p._id === productId)).toMatchObject({ starterKey: "polka-man", filament: "sky", priceCents: 1200 });
+});
+
+test("owners can order unpublished drafts without earning money or sales", async () => {
+  const { t } = await seeded();
+  const productId = await t.mutation(api.products.createStarter, { deviceId: "phone-2", filament: "bone" });
+  await expect(t.mutation(internal.orders.createPending, { deviceId: "phone-1", productId })).rejects.toThrow("not available");
+  const { orderId } = await t.mutation(internal.orders.createPending, { deviceId: "phone-2", productId });
+  await t.mutation(internal.orders.markPaid, { orderId, whopPaymentId: "pay_self" });
+  await t.mutation(internal.orders.markPaid, { orderId, whopPaymentId: "pay_self" });
+  expect((await t.query(api.orders.mine, { deviceId: "phone-2" }))[0]).toMatchObject({ status: "paid", fulfillment: "queued" });
+  expect((await t.query(api.products.get, { productId }))!.salesCount).toBe(0);
+  expect((await t.query(api.profiles.me, { deviceId: "phone-2" }))!.earningsCents).toBe(0);
+  expect(await t.query(api.orders.sales, { deviceId: "phone-2" })).toEqual([]);
+  await t.run(async ctx => { await ctx.db.patch(productId, { status: "generating" }); });
+  await expect(t.mutation(internal.orders.createPending, { deviceId: "phone-2", productId })).rejects.toThrow("not available");
+});
+
+test("self-orders of published designs never change challenge scores", async () => {
+  const { t, live } = await seeded();
+  const duel = live.find(d => d.productA.name === "Sleepy capybara planter")!;
+  const profile = (await t.query(api.profiles.me, { deviceId: "phone-1" }))!;
+  const { orderId } = await t.mutation(internal.orders.createPending, { deviceId: "phone-1", productId: duel.productA._id });
+  await t.mutation(internal.orders.markPaid, { orderId, whopPaymentId: "pay_own_published" });
+  const after = (await t.query(api.duels.get, { duelId: duel._id }))!;
+  expect(after.salesA).toBe(duel.salesA);
+  expect(after.productA.salesCount).toBe(duel.productA.salesCount);
+  expect((await t.query(api.profiles.me, { deviceId: "phone-1" }))!.earningsCents).toBe(profile.earningsCents);
 });
 
 test("reset rebuilds the demo world so the seeded profile can be claimed again", async () => {
@@ -301,4 +349,18 @@ test("a refused fal request marks the design failed", async () => {
     status: "failed",
     failureReason: "The model service refused the request (status 401)",
   });
+});
+
+test("the bundled Friday model saves with its original appearance and survives recolor/reset", async () => {
+  const { t } = await seeded();
+  const productId = await t.mutation(api.products.createStarter, {
+    deviceId: "phone-2", filament: "bone", starterKey: "friday-home", colorCustomized: false,
+  });
+  expect(await t.query(api.products.get, { productId })).toMatchObject({
+    starterKey: "friday-home", colorCustomized: false, status: "ready",
+  });
+  await t.mutation(api.products.setFilament, { deviceId: "phone-2", productId, filament: "sky" });
+  expect((await t.query(api.products.get, { productId }))?.colorCustomized).toBe(true);
+  await t.mutation(api.products.setFilament, { deviceId: "phone-2", productId, filament: "sky", useOriginal: true });
+  expect(await t.query(api.products.get, { productId })).toMatchObject({ starterKey: "friday-home", colorCustomized: false });
 });

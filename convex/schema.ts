@@ -1,9 +1,38 @@
 import { defineSchema, defineTable } from "convex/server";
 import { v } from "convex/values";
+import { catalogKey } from "./lib/catalog";
+
+export const starterKey = v.union(v.literal("polka-man"), v.literal("friday-home"));
+
+export const generationQuality = v.union(v.literal("fast"), v.literal("detailed"));
+export const generationStage = v.union(v.literal("submitting"), v.literal("queued"), v.literal("generating"), v.literal("preparingPrint"));
 
 export const side = v.union(v.literal("a"), v.literal("b"));
 
 export default defineSchema({
+  whopStores: defineTable({
+    profileId: v.id("profiles"),
+    accountId: v.string(),
+    name: v.string(),
+    apiKeyEnv: v.string(),
+    webhookSecretEnv: v.string(),
+  }).index("by_profileId", ["profileId"]).index("by_accountId", ["accountId"]),
+
+  // Immutable request snapshot and resumable external IDs. Never returned to clients.
+  whopListings: defineTable({
+    productId: v.id("products"),
+    accountId: v.string(),
+    name: v.string(),
+    description: v.string(),
+    filament: v.string(),
+    thumbnailUrl: v.optional(v.string()),
+    priceCents: v.number(),
+    imageId: v.optional(v.string()),
+    whopProductId: v.optional(v.string()),
+    whopVariantId: v.optional(v.string()),
+    listingUrl: v.optional(v.string()),
+  }).index("by_productId", ["productId"]),
+
   profiles: defineTable({
     deviceId: v.string(),
     displayName: v.string(),
@@ -37,12 +66,28 @@ export default defineSchema({
     printNote: v.optional(v.string()),
     thumbnailUrl: v.optional(v.string()),
     usdzUrl: v.optional(v.string()),
+    starterKey: v.optional(starterKey),
+    catalogKey: v.optional(catalogKey),
+    colorCustomized: v.optional(v.boolean()),
     stlUrl: v.optional(v.string()),
+    generationQuality: v.optional(generationQuality),
+    generationEndpoint: v.optional(v.string()),
+    generationStage: v.optional(generationStage),
+    generationRequestedAt: v.optional(v.number()),
+    submittedAt: v.optional(v.number()),
+    providerStartedAt: v.optional(v.number()),
+    providerCompletedAt: v.optional(v.number()),
+    previewReadyAt: v.optional(v.number()),
+    printPreparationStartedAt: v.optional(v.number()),
+    printPreparationFinishedAt: v.optional(v.number()),
+    generationFinishedAt: v.optional(v.number()),
     falRequestId: v.optional(v.string()),
     falStatusUrl: v.optional(v.string()),
     falResponseUrl: v.optional(v.string()),
     failureReason: v.optional(v.string()),
     salesCount: v.number(),
+    whopListingUrl: v.optional(v.string()),
+    whopPublishPriceCents: v.optional(v.number()),
   })
     .index("by_creator", ["creatorId"])
     .index("by_status", ["status"])
@@ -88,6 +133,7 @@ export default defineSchema({
       v.literal("printing"),
     ),
     whopCheckoutId: v.optional(v.string()),
+    whopAccountId: v.optional(v.string()),
     purchaseUrl: v.optional(v.string()),
     whopPaymentId: v.optional(v.string()),
     paidAt: v.optional(v.number()),

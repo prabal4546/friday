@@ -1,122 +1,130 @@
 import { v } from "convex/values";
 import { api, internal } from "./_generated/api";
 import { internalAction } from "./_generated/server";
+import { GENERATION_ENDPOINTS, generationInput } from "./lib/generationConfig";
 import { objToBinaryStl } from "./lib/stl";
 
-const FAL_MODEL = "fal-ai/meshy/v7.1/text-to-3d";
-const POLL_MS = 10 * 1000;
+const POLL_MS = 10_000;
 const MAX_POLLS = 60;
 
-function fileUrl(value: unknown, key: string) {
-  if (typeof value !== "object" || value === null) return undefined;
-  const file = (value as Record<string, unknown>)[key];
-  if (typeof file !== "object" || file === null) return undefined;
-  const url = (file as Record<string, unknown>).url;
-  return typeof url === "string" ? url : undefined;
+function record(value: unknown): Record<string, unknown> | null {
+  return typeof value === "object" && value !== null ? value as Record<string, unknown> : null;
 }
+function fileUrl(value: unknown, key: string) {
+  const url = record(record(value)?.[key])?.url;
+  return typeof url === "string" && url.startsWith("https://") ? url : undefined;
+}
+function transient(status: number) { return status === 408 || status === 429 || status >= 500; }
 
 export const start = internalAction({
   args: { productId: v.id("products") },
-  handler: async (ctx, args) => {
+  returns: v.null(),
+  handler: async (ctx, { productId }) => {
     const key = process.env.FAL_KEY;
-    const product = await ctx.runQuery(api.products.get, args);
-    if (key === undefined || product === null || product.status !== "generating") return null;
-
+    const product = await ctx.runQuery(api.products.get, { productId });
+    if (!key || product === null || product.status !== "generating") return null;
+    if (!await ctx.runMutation(internal.products.claimSubmission, { productId })) return null;
+    const quality = product.generationQuality ?? "detailed";
+    const endpoint = product.generationEndpoint ?? GENERATION_ENDPOINTS[quality];
     const webhook = encodeURIComponent(`${process.env.CONVEX_SITE_URL}/webhooks/fal`);
-    const response = await fetch(`https://queue.fal.run/${FAL_MODEL}?fal_webhook=${webhook}`, {
-      method: "POST",
-      headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({
-        prompt: product.prompt,
-        mode: "preview",
-        topology: "triangle",
-        target_polycount: 20000,
-      }),
-    });
-    const queued: unknown = response.ok ? await response.json() : null;
-    const { request_id, status_url, response_url } = (queued ?? {}) as Record<string, unknown>;
-    if (
-      typeof request_id !== "string" ||
-      typeof status_url !== "string" ||
-      typeof response_url !== "string" ||
-      !status_url.startsWith("https://queue.fal.run/") ||
-      !response_url.startsWith("https://queue.fal.run/")
-    ) {
-      await ctx.runMutation(internal.products.failGeneration, {
-        productId: args.productId,
-        reason: `The model service refused the request (status ${response.status})`,
+    try {
+      // Never retry submission: a lost response may still represent a billed provider job.
+      const response = await fetch(`https://queue.fal.run/${endpoint}?fal_webhook=${webhook}`, {
+        method: "POST", headers: { Authorization: `Key ${key}`, "Content-Type": "application/json" },
+        body: JSON.stringify(generationInput(product.prompt, quality)), signal: AbortSignal.timeout(60_000),
       });
-      return null;
+      const queued = record(response.ok ? await response.json() : null);
+      const requestId = queued?.request_id, statusUrl = queued?.status_url, responseUrl = queued?.response_url;
+      if (typeof requestId !== "string" || typeof statusUrl !== "string" || typeof responseUrl !== "string" ||
+          !statusUrl.startsWith("https://queue.fal.run/") || !responseUrl.startsWith("https://queue.fal.run/")) {
+        await ctx.runMutation(internal.products.failGeneration, { productId, reason: `The model service refused the request (status ${response.status})` });
+        return null;
+      }
+      await ctx.runMutation(internal.products.attachFalRequest, { productId, falRequestId: requestId, falStatusUrl: statusUrl, falResponseUrl: responseUrl });
+      await ctx.scheduler.runAfter(POLL_MS, internal.generation.poll, { productId, attempt: 1 });
+    } catch (error) {
+      console.error("Generation submission failed", error);
+      await ctx.runMutation(internal.products.failGeneration, { productId, reason: "Couldn't submit the model. Please try again." });
     }
-    await ctx.runMutation(internal.products.attachFalRequest, {
-      productId: args.productId,
-      falRequestId: request_id,
-      falStatusUrl: status_url,
-      falResponseUrl: response_url,
-    });
-    await ctx.scheduler.runAfter(POLL_MS, internal.generation.poll, { productId: args.productId, attempt: 1 });
     return null;
   },
 });
 
 export const poll = internalAction({
   args: { productId: v.id("products"), attempt: v.number() },
-  handler: async (ctx, args) => {
+  returns: v.null(),
+  handler: async (ctx, { productId, attempt }) => {
     const key = process.env.FAL_KEY;
-    const product = await ctx.runQuery(api.products.get, { productId: args.productId });
-    if (
-      key === undefined ||
-      product === null ||
-      product.status !== "generating" ||
-      product.falStatusUrl === undefined ||
-      product.falResponseUrl === undefined
-    ) {
-      return null;
-    }
+    const product = await ctx.runQuery(api.products.get, { productId });
+    if (!key || product === null || product.status !== "generating" || product.previewReadyAt !== undefined ||
+        !product.falStatusUrl || !product.falResponseUrl) return null;
     const headers = { Authorization: `Key ${key}` };
-    const fail = (reason: string) =>
-      ctx.runMutation(internal.products.failGeneration, { productId: args.productId, reason });
-
-    const statusResponse = await fetch(product.falStatusUrl, { headers });
-    const status: unknown = statusResponse.ok ? await statusResponse.json() : null;
-    if ((status as Record<string, unknown> | null)?.status !== "COMPLETED") {
-      if (args.attempt >= MAX_POLLS) {
-        await fail("The model service timed out");
-      } else {
-        await ctx.scheduler.runAfter(POLL_MS, internal.generation.poll, {
-          productId: args.productId,
-          attempt: args.attempt + 1,
-        });
+    const fail = (reason: string) => ctx.runMutation(internal.products.failGeneration, { productId, reason });
+    const retry = async () => {
+      if (attempt >= MAX_POLLS) await fail("The model service timed out");
+      else await ctx.scheduler.runAfter(POLL_MS, internal.generation.poll, { productId, attempt: attempt + 1 });
+    };
+    try {
+      const response = await fetch(product.falStatusUrl, { headers, signal: AbortSignal.timeout(30_000) });
+      if (!response.ok) {
+        if (transient(response.status)) await retry();
+        else await fail("Couldn't retrieve this generation from the model service.");
+        return null;
       }
-      return null;
+      const status = record(await response.json());
+      if (status?.status === "FAILED" || status?.status === "ERROR") {
+        await fail("The model service couldn't generate this design.");
+        return null;
+      }
+      if (status?.status !== "COMPLETED") {
+        if (status?.status === "IN_QUEUE" || status?.status === "IN_PROGRESS") {
+          await ctx.runMutation(internal.products.updateGenerationStage, { productId, stage: status.status === "IN_QUEUE" ? "queued" : "generating" });
+        }
+        await retry();
+        return null;
+      }
+      await ctx.runMutation(internal.products.observeProviderCompletion, { productId });
+      const resultResponse = await fetch(product.falResponseUrl, { headers, signal: AbortSignal.timeout(30_000) });
+      if (!resultResponse.ok) {
+        if (transient(resultResponse.status)) await retry();
+        else await fail("The model service couldn't generate this design.");
+        return null;
+      }
+      const result = record(await resultResponse.json());
+      const usdzUrl = fileUrl(result?.model_urls, "usdz");
+      if (!usdzUrl) {
+        await fail("The model service could not make this design");
+        return null;
+      }
+      await ctx.runMutation(internal.products.attachPreview, {
+        productId, usdzUrl, objUrl: fileUrl(result?.model_urls, "obj"), thumbnailUrl: fileUrl(result, "thumbnail"),
+      });
+    } catch (error) {
+      console.error("Generation status temporarily unavailable", error);
+      await retry();
     }
+    return null;
+  },
+});
 
-    const resultResponse = await fetch(product.falResponseUrl, { headers });
-    const result: unknown = resultResponse.ok ? await resultResponse.json() : null;
-    const models = (result as Record<string, unknown> | null)?.model_urls;
-    const usdzUrl = fileUrl(models, "usdz");
-    if (usdzUrl === undefined) {
-      await fail("The model service could not make this design");
-      return null;
-    }
-
+export const preparePrint = internalAction({
+  args: { productId: v.id("products"), objUrl: v.optional(v.string()) },
+  returns: v.null(),
+  handler: async (ctx, { productId, objUrl }) => {
+    if (!await ctx.runMutation(internal.products.claimPrintPreparation, { productId })) return null;
+    const product = await ctx.runQuery(api.products.get, { productId });
+    if (!product?.usdzUrl) return null;
     let stlUrl: string | undefined;
-    const objUrl = fileUrl(models, "obj");
-    if (objUrl !== undefined) {
+    if (objUrl) {
       try {
-        const stl = objToBinaryStl(await (await fetch(objUrl)).text());
+        const response = await fetch(objUrl, { signal: AbortSignal.timeout(60_000) });
+        if (!response.ok) throw new Error(`OBJ download failed: ${response.status}`);
+        const stl = objToBinaryStl(await response.text());
         const storageId = await ctx.storage.store(new Blob([stl], { type: "model/stl" }));
         stlUrl = (await ctx.storage.getUrl(storageId)) ?? undefined;
-      } catch (error) {
-        console.error("Could not prepare the STL print file", error);
-      }
+      } catch (error) { console.error("Could not prepare the STL print file", error); }
     }
-    await ctx.runMutation(internal.products.finishGeneration, {
-      productId: args.productId,
-      usdzUrl,
-      stlUrl,
-      thumbnailUrl: fileUrl(result, "thumbnail"),
-    });
+    await ctx.runMutation(internal.products.finishGeneration, { productId, usdzUrl: product.usdzUrl, thumbnailUrl: product.thumbnailUrl, stlUrl });
     return null;
   },
 });

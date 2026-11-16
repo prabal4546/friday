@@ -5,7 +5,7 @@ enum Side: String, CaseIterable {
 }
 
 enum Filament: String, CaseIterable, Identifiable {
-    case sky, grape, sunflower, caramel, lava, matcha, bone, tangerine
+    case bone, tangerine, matcha, grape, sky, sunflower, caramel, lava
 
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
@@ -30,6 +30,24 @@ struct Profile: Equatable {
     var credits: Int
     var wins: Int
     var earningsCents: Int
+}
+
+enum GenerationQuality: String, CaseIterable, Identifiable {
+    case fast, detailed
+    var id: String { rawValue }
+    var label: String { rawValue.capitalized }
+}
+
+enum GenerationStage: String {
+    case submitting, queued, generating, preparingPrint
+    var label: String {
+        switch self {
+        case .submitting: "Submitting"
+        case .queued: "In queue"
+        case .generating: "Generating model"
+        case .preparingPrint: "Preparing print file"
+        }
+    }
 }
 
 struct Product: Identifiable, Hashable {
@@ -58,6 +76,17 @@ struct Product: Identifiable, Hashable {
     var printNote: String?
     var failureReason: String?
     var usdzURL: URL?
+    var thumbnailURL: URL?
+    var starterKey: String?
+    var catalogKey: String?
+    var hasOriginalAppearance: Bool { usdzURL != nil || starterKey == "friday-home" }
+    var colorCustomized: Bool?
+    var generationQuality: GenerationQuality?
+    var generationStage: GenerationStage?
+    var generationRequestedAt: Date?
+    var generationFinishedAt: Date?
+    var whopListingURL: URL?
+    var whopPublishPriceCents: Int?
 }
 
 struct Duel: Identifiable, Hashable {
@@ -133,4 +162,17 @@ struct MeltError: LocalizedError {
 
 func dollars(_ cents: Int) -> String {
     (Decimal(cents) / 100).formatted(.currency(code: "USD"))
+}
+
+struct CheckoutResult {
+    let orderId: String
+    let purchaseURL: URL?
+}
+
+extension Product {
+    static let starter = Product(
+        id: "starter-friday-home", name: "Polka-dot man keychain", prompt: "A polka-dot man keychain",
+        creatorId: "", creatorName: "You", status: .ready, filament: .bone,
+        priceCents: 1500, salesCount: 0, starterKey: "friday-home", colorCustomized: false
+    )
 }

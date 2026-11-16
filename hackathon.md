@@ -1,6 +1,6 @@
 # Hackathon log
 
-- **Project:** Melt
+- **Project:** Friday
 - **Event:** Consumer Mobile Hackathon
 - **What it does:** Native SwiftUI iOS app where creators describe a 3D-printable product, sell it through Whop, and duel other creators on sales while everyone else stakes demo credits on the winner.
 - **Live app:** not deployed

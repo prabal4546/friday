@@ -1,151 +1,63 @@
-# Melt
+# Friday
 
-Melt is a native SwiftUI iOS app for the Consumer Mobile Hackathon: describe a product, get a 3D-printable model, sell it through Whop, and duel other creators on sales while everyone else stakes demo credits on the winner.
+Friday is a native SwiftUI app for creating small objects, ordering prints, publishing designs, and competing with friends on sales.
 
-This repository holds the Convex backend, the SwiftUI app, the Whop sandbox payment boundary, and the Revyl build config. Browsing, staking, generating and publishing a design, checkout, creator earnings, and demo print fulfillment work today.
+## App
 
-## Layout
+The app opens in **Create** with the supplied textured polka-dot man keychain, bundled as `Melt/Resources/FridayHome.usdz`. Rotate it, choose a body color, edit the prompt, or save it as a draft. The original texture is selected initially; Original restores it after recoloring. Opening the app does not call a generation service.
 
-| Path | What it is |
-| --- | --- |
-| `convex/` | Backend: schema, queries, mutations, the Whop checkout action, and HTTP webhooks |
-| `convex/generation.ts` | Model generation through fal: queue the job, poll it, keep the USDZ link and an STL |
-| `convex/lib/stl.ts` | Converts fal's OBJ into the binary STL a printer needs |
-| `convex/seed.ts` | Deterministic demo world (6 creators, 11 products, 3 live and 2 settled duels) |
-| `convex/melt.test.ts` | Backend tests, run with `pnpm test` |
-| `Melt/` | SwiftUI app sources |
-| `MeltUITests/` | UI tests that drive the app on a simulator |
-| `project.yml`, `Melt.xcodeproj` | XcodeGen spec and the project it generates (both committed) |
-| `Config/Melt.xcconfig` | The Convex deployment URL the app connects to |
-| `.revyl/config.yaml` | Revyl build recipe for the simulator app |
+- **Create:** preview, color, prompt, generation, ordering, and publishing.
+- **Explore:** published products and 24-hour sales challenges. Credit backing lives inside challenge details.
+- **My shelf:** designs, orders, and sales. Profile editing is separate.
 
-## Backend
+Prompt input and generation quality persist between launches. Every launch opens the supplied model; saved designs remain in My shelf. Generated models use RealityKit and a local USDZ cache. Imported materials and textures are preserved by default. Explicit recoloring changes only the material tint; the Original control restores the source appearance. The bundled starter keeps the original GLB geometry, normals, UVs, JPEG texture and material settings. `scripts/convert-home-model.py` reproduces its USDZ from the original GLB. Older saved procedural keychains remain compatible. Customer copy uses functional labels without demo banners or promotional slogans.
 
-Requires Node 22 or newer and pnpm.
+Fast/Detailed is remembered between launches. Fast uses Meshy T2 preview geometry (4,000 target triangles); Detailed uses Meshy 7.1 preview geometry (20,000). Neither mode adds texturing. The six-request development comparison measured median ready times of 28.9s and 108.7s respectively. Detailed remains the default because Fast missed requested functional features. These are observed runs, not latency guarantees; prompts, timings and observations are in `scripts/generation-benchmark-results.json`.
+
+The preview starts at 35° yaw with a camera elevated 15°, fitted to the rotated bounds. A model-shaped ground shadow and key/fill lighting reveal depth. New full-size previews make one four-second turn to 55°; drag interrupts it. Reduce Motion and grid thumbnails skip that turn, and leaving the screen or app stops motion. Horizontal rotation, bounded vertical orbit, and explicit Spin/Pause remain available. USDZ files without material bindings receive a neutral fallback; authored materials are retained.
+
+The seven preloaded shop/challenge designs use explicit `catalogKey` values and bundled RealityKit geometry in `Melt/CatalogModel.swift`. Their compact artwork and interactive previews need no model downloads. These visual models do not supply printable STL files. Repair legacy records with the internal `seed:repairCatalog` mutation using reviewed product IDs; it updates only the catalog key and skips existing media. Never reset the database to repair previews.
+
+## Development
+
+Requires Node 22+, pnpm, and Xcode with an iOS 18+ simulator runtime.
 
 ```sh
 pnpm install
 pnpm test
-```
-
-To run against a local backend with no Convex account:
-
-```sh
-# serves http://127.0.0.1:3210 and points .env.local at it; keep it running
-CONVEX_AGENT_MODE=anonymous CONVEX_DEPLOYMENT=anonymous:anonymous-agent pnpm dev
-# in a second terminal, safe to repeat
-CONVEX_AGENT_MODE=anonymous pnpm seed
-```
-
-The app's default backend is the cloud dev deployment `https://wry-skunk-692.convex.cloud`, set in `Config/Melt.xcconfig`. To push backend changes to it, run `pnpm exec convex login` once, then `pnpm dev`. If the CLI was last used with the local backend, point it back at the cloud first:
-
-```sh
-pnpm exec convex dev --once --configure existing --team prabaljit-walia --project melt --dev-deployment cloud
-```
-
-`pnpm exec convex run seed:reset` wipes the deployment and rebuilds the demo world. Run it before a demo so the next device to open the app takes over the seeded "You" profile.
-
-### Identity
-
-There is no sign-in. The app stores a random device ID in the Keychain and passes it to every function. `profiles:ensure` creates a profile with 1,250 demo credits; the first device that calls it with `claimSeed: true` takes over the seeded "You" profile and its products.
-
-### Environment variables
-
-These live on the Convex deployment only. They never go in the repository or the app.
-
-| Name | Purpose |
-| --- | --- |
-| `FAL_KEY` | fal API key for model generation. Without it, new designs get a stand-in shape |
-| `WHOP_API_KEY` | Company API key from the Whop sandbox dashboard, used by `whop:createCheckout` |
-| `WHOP_WEBHOOK_SECRET` | The `ws_...` secret of the webhook that points at this deployment |
-| `WHOP_ENVIRONMENT` | Optional. Anything other than `production` uses the Whop sandbox API |
-
-Each command prompts for the value, so it stays out of your shell history. `pnpm exec convex env list` shows what is set.
-
-```sh
-pnpm exec convex env set FAL_KEY
-pnpm exec convex env set WHOP_API_KEY
-pnpm exec convex env set WHOP_WEBHOOK_SECRET
-```
-
-## Model generation
-
-`products:create` adds a design with the status `generating`. What happens next depends on `FAL_KEY`:
-
-- **Key set.** `generation:start` queues the prompt on fal's Meshy 7.1 text-to-3D model (`fal-ai/meshy/v7.1/text-to-3d`, preview mode, about $0.80 a model). fal calls `/webhooks/fal` when the job ends, and a poll every 10 seconds for up to 10 minutes covers a missed callback. The finished design keeps fal's USDZ link for the in-app preview. fal returns no STL, so the OBJ is converted to a binary STL (Z up, longest side 80 mm) and kept in Convex file storage for printing. If the conversion fails the design is still usable and carries a printability warning. A refused, failed, or timed-out job marks the design failed with a reason.
-- **No key.** A scheduled mutation turns the design into a draft after three seconds with no model file, so the whole flow stays usable.
-
-In the app, a design's page downloads the USDZ once, caches it in the app's Caches folder, and shows it on a RealityKit turntable you can drag to orbit, pause, and recolor with the filament picker. When a design has no model, or the file can't be loaded, the turntable shows a stand-in shape and says so.
-
-## Whop sandbox
-
-1. Create an API key at sandbox.whop.com/dashboard/developer and set it as `WHOP_API_KEY`.
-2. Add a webhook for the `payment.succeeded` event that points at `https://<name>.convex.site/webhooks/whop`, and set its secret as `WHOP_WEBHOOK_SECRET`.
-
-`whop:createCheckout` records a pending order, then creates a one-time checkout whose metadata carries `productId`, `creatorId`, and `orderId`. The webhook verifies the Standard Webhooks signature, marks the order paid exactly once, and counts the sale toward the product's live duel. A paid order stops at fulfillment `queued`; nothing is sent to a print service.
-
-Arena links to the creator storefront, which lists every published design without adding a fourth tab. A buyer opens one and taps Buy; with `WHOP_API_KEY` set, Melt opens Whop's hosted sandbox checkout. The payment webhook is the only path that marks that order paid. Without a key, the same button makes an explicitly labelled demo payment so the two-person judge flow remains runnable.
-
-Paid orders appear live on both devices: the buyer sees the order in Library, while the creator sees the sale and earnings. The creator can advance it through **Paid → Submitted → Printing**. Submitted creates a local Slant draft ID and quote; the app never calls a production print endpoint.
-
-To prove the no-key flow from the CLI after seeding, use two distinct device IDs:
-
-```sh
-pnpm exec convex run profiles:ensure '{"deviceId":"seller","claimSeed":true}'
-pnpm exec convex run profiles:ensure '{"deviceId":"buyer","displayName":"Judge Buyer"}'
-pnpm exec convex run products:storefront '{}'
-pnpm exec convex run orders:mine '{"deviceId":"buyer"}'
-pnpm exec convex run orders:sales '{"deviceId":"seller"}'
-```
-
-## iOS app
-
-Requires Xcode with an iOS 18 or newer Simulator runtime. The app keeps the three approved tabs, Arena, Create, and Library. Arena links to the storefront and a new-duel form. Open another creator's published product to connect, then pair one of your published designs with one of theirs in a 24-hour sales duel. Stakes, friendships, published products, orders, earnings, fulfillment, new designs, and duel scores from any client appear without a refresh.
-
-Open `Melt.xcodeproj` in Xcode, pick an iPhone simulator, and press Run. Or from the command line:
-
-```sh
+pnpm typecheck
 xcodebuild -project Melt.xcodeproj -scheme Melt -configuration Debug \
   -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
   -derivedDataPath build ARCHS=arm64
-open -a Simulator    # boot an iPhone from File > Open Simulator if none is running
-xcrun simctl install booted build/Build/Products/Debug-iphonesimulator/Melt.app
-xcrun simctl launch booted com.prabaljitwalia.melt
 ```
 
-Launch arguments, added to the end of the launch command:
+Open `Melt.xcodeproj` and run the `Melt` scheme, or install `build/Build/Products/Debug-iphonesimulator/Melt.app` with `xcrun simctl`. Regenerate the project with `xcodegen generate` after changing the source layout or `project.yml`.
 
-- `-ConvexDeploymentURL http://127.0.0.1:3210` uses the local backend instead of the cloud one.
-- `-MeltScenario demo` runs on built-in fixtures (`Melt/Fixtures.swift`) with no backend at all. `-MeltScenario empty` and `-MeltScenario error` show the empty and failed-to-load states.
+`Config/Melt.xcconfig` points to the development deployment `https://wry-skunk-692.convex.cloud`. The launch argument `-ConvexDeploymentURL <url>` overrides it.
 
-The UI tests walk the main flow on fixtures (stake on a duel, open a product preview, recolor a design, generate a design, find it in Library) and both of those states:
+Explicit offline fixtures are available with `-MeltScenario demo`, `-MeltScenario empty`, and `-MeltScenario error`. These isolate local session preferences from the connected app and simulate generation/payment only within fixture execution. The error scenario still allows interaction with the local starter. `connected` is not a fixture scenario and cannot substitute placeholder geometry. No UI tests were run for this change.
 
-```sh
-xcodebuild test -project Melt.xcodeproj -scheme Melt -derivedDataPath build \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
-```
+Debug builds also support `-MeltInspectModel YES`: copy a real product JSON document to the simulator app's Documents/preview-inspection.json to inspect it through the production renderer without backend writes. `-MeltInspectReduceMotion YES` sets the debug viewer's Reduce Motion environment. Add `-MeltInspectCatalog <catalogKey>` to inspect a bundled model without backend access or demo mode. This viewer is excluded from Release builds. Omit these arguments to run the normal app.
 
-To also run the live test, reset the seed and pass the deployment URL. It stakes on a duel and creates a design on that deployment, which is a real, billed generation when `FAL_KEY` is set:
+`node scripts/benchmark-generation.mjs` submits the six paid comparison requests to development, once each. It saves intent before each submission and resumes existing jobs from `build/generation-benchmark/results.json`; it never automatically repeats an ambiguous paid submission. Do not remove that file to resume. Screenshots and downloaded comparison assets are under the ignored `build/` directory.
 
-```sh
-pnpm exec convex run seed:reset
-TEST_RUNNER_MELT_LIVE_URL=https://wry-skunk-692.convex.cloud xcodebuild test -project Melt.xcodeproj \
-  -scheme Melt -derivedDataPath build -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
-pnpm exec convex run seed:reset
-```
+## Backend and integration boundaries
 
-`testLiveModel` checks a real model in the preview: it opens a ready design from the simulator's Library and fails if the stand-in shape is showing. Generate a design in the app first, wait until it leaves `generating`, and don't reset the seed in between:
+Convex provides profiles, products, orders, friendships, challenges, and credit backing. Existing identity is a Keychain device ID; this project does not add account authentication.
 
-```sh
-TEST_RUNNER_MELT_LIVE_URL=https://wry-skunk-692.convex.cloud TEST_RUNNER_MELT_LIVE_MODEL="A tiny rocket" \
-  xcodebuild test -project Melt.xcodeproj -scheme Melt -derivedDataPath build \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' \
-  -only-testing:MeltUITests/MeltUITests/testLiveModel
-```
+- `products:createStarter` saves an owned keychain draft without invoking fal. Its optional `starterKey` is compatible with existing products.
+- `products:create` requires `FAL_KEY` and accepts optional `generationQuality: "fast" | "detailed"`. Omitted quality remains Detailed for older clients. Each new product snapshots its quality and endpoint. Missing credentials return an error instead of creating a stand-in design.
+- USDZ availability is committed before OBJ-to-STL preparation. The product remains `generating` until preparation finishes, preserving ordering/publishing readiness. A failed print conversion retains the preview with the existing printability warning.
+- Generation exposes submitting, queued, generating and preparing-print stages plus elapsed time, without estimated percentages. Timestamps record the initial request, submission claim, observed provider start/completion, preview availability and print preparation start/finish. Provider timestamps are observations, not exact provider execution timestamps.
+- Webhooks trigger a provider-verified completion check; ten-second polling is the fallback. Submission and completion claims prevent duplicate paid requests and duplicate preparation. Transient status/result fetch failures retry the existing request. Terminal results fail promptly.
+- `whop:publishProduct` exports an owned ready design (or existing Friday listing) to its assigned Whop sandbox store at a price between $5 and $500. It transfers available thumbnails, creates a one-time USD variant, makes the product visible, and returns its product-page link. `products:publish` remains the legacy Friday-only endpoint.
+- Owners can order their ready or published designs. Other buyers can order published designs only. Self-orders do not increase earnings, sales counts, or challenge scores and are excluded from the seller's sales list.
+- `whop:createCheckout` routes to the creator's assigned sandbox account and uses the published variant when available. Draft and legacy-listing purchases use a hidden inline variant. Payment webhooks check the seller account and update orders idempotently, including a confirmed payment whose checkout response was lost. Missing store assignments or credentials return an error before inserting an order.
+- Production checkout remains disabled. No production printing or shipping endpoint is connected. Customer screens show stored order states, not delivery promises. Fulfillment simulation is an internal backend helper with no customer-facing controls.
 
-In an xcconfig file `//` starts a comment, so the URL in `Config/Melt.xcconfig` is written as `https:/$()/wry-skunk-692.convex.cloud`.
+Deployment secrets: `FAL_KEY`, `WHOP_API_KEY`, `WHOP_WEBHOOK_SECRET`, and `WHOP_ENVIRONMENT=sandbox`. Keep them on the deployment, never in the app. Whop's signed `payment.succeeded` webhook is `/webhooks/whop`; fal completion is `/webhooks/fal` with polling as a fallback.
 
-After editing `project.yml`, regenerate the project with `xcodegen generate` and commit the result.
+Backend checks cover generation, publishing, ownership, personal orders, self-order accounting exclusions, ordinary sales, duplicate payments, and unavailable integrations. Do not reset seeded data to verify a UI change.
 
 ## Agent tooling
 
@@ -164,3 +76,22 @@ revyl device start --app-id f867bd88-1e8c-447a-bb1a-c5f7744a97cc --open
 ```
 
 Revyl's cloud simulators cannot reach a backend on your machine, so point `Config/Melt.xcconfig` at a cloud Convex deployment before building there.
+
+## Whop hackathon setup
+
+The connected flow is **sandbox payment → confirmed Friday order**, and **publish → visible Whop store product**. Printing is manual. Direct Whop-store purchases remain in Whop; Friday order tracking applies to checkouts started in Friday. Production payments are disabled.
+
+Demo assignments are internal `whopStores` records. Nova and the existing “You” demo profiles use TCMH; Orbit uses the secondary sandbox store. New installations show their profile ID in the publishing sheet when a store has not been assigned. No OAuth or automatic store claiming is included.
+
+From this repository, with the development deployment selected:
+
+```sh
+node scripts/whop-demo.mjs inspect
+node scripts/whop-demo.mjs assign PROFILE_ID ACCOUNT_ID WHOP_WEBHOOK_STORE_A
+```
+
+The setup script is pinned to `dev:wry-skunk-692` and sandbox mode. It registers a per-store payment webhook and stores its signing secret in the named deployment environment variable. Credentials stay server-side. Existing webhook secrets are reused when assigning another profile. Different API keys can be configured through the internal `whopData:assignStore` function's `apiKeyEnv` field.
+
+Publishing records an immutable request snapshot and external IDs in `whopListings`. Retries retain the original price/color and resume after completed steps; a thumbnail still processing at Whop leaves the product hidden until a retry succeeds. Existing Friday listings are exported only when their owner explicitly chooses Publish to Whop. Keys for Whop requests are stable across retries.
+
+Verification completed against real sandbox APIs: a personal-draft checkout paid with Whop's documented test card, a successful payment webhook delivery, a paid/queued Friday order, and listings in two separate sandbox stores (including a generated design's thumbnail). Sandbox test cards use `4242 4242 4242 4242`, a future expiry, and any three-digit CVC. Never use a real card for this demo.

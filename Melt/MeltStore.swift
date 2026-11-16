@@ -10,8 +10,33 @@ final class MeltStore: ObservableObject {
         case failed(String)
     }
 
+    @Published var shelfSection = ShelfSection.designs
+    @Published var selectedTab = MeltTab.create
+    @Published var creatorPrompt = Product.starter.prompt {
+        didSet { UserDefaults.standard.set(creatorPrompt, forKey: "\(sessionPrefix).prompt") }
+    }
+    @Published var activeProductId: String? {
+        didSet { UserDefaults.standard.set(activeProductId, forKey: "\(sessionPrefix).product") }
+    }
+    @Published var creatorColorCustomized = false
+    @Published var creatorFilament = Filament.bone {
+        didSet { UserDefaults.standard.set(creatorFilament.rawValue, forKey: "\(sessionPrefix).filament") }
+    }
+    @Published var generationQuality = GenerationQuality.detailed {
+        didSet { UserDefaults.standard.set(generationQuality.rawValue, forKey: "creator.quality") }
+    }
+    private var introducedModels = Set(UserDefaults.standard.stringArray(forKey: "preview.introducedModels") ?? [])
+
+    func claimModelIntroduction(_ id: String) -> Bool {
+        guard introducedModels.insert(id).inserted else { return false }
+        UserDefaults.standard.set(Array(introducedModels), forKey: "preview.introducedModels")
+        return true
+    }
+
     @Published private(set) var phase = Phase.loading
     @Published private(set) var profile: Profile?
+    @Published private(set) var whopStore: WhopStoreRecord?
+    @Published private(set) var whopStoreLoaded = false
     @Published private(set) var products: [Product] = []
     @Published private(set) var storefront: [Product] = []
     @Published private(set) var liveDuels: [Duel] = []
@@ -30,9 +55,28 @@ final class MeltStore: ObservableObject {
     private var subscriptions = Set<AnyCancellable>()
     private var awaited = Set<String>()
 
+    private var sessionPrefix: String { scenario == nil ? "creator" : "fixture" }
+
+    init() {
+        generationQuality = GenerationQuality(rawValue: UserDefaults.standard.string(forKey: "creator.quality") ?? "") ?? .detailed
+        if scenario == nil {
+            creatorPrompt = UserDefaults.standard.string(forKey: "creator.prompt") ?? Product.starter.prompt
+            // Each launch opens on the bundled design; saved work stays in My shelf.
+            activeProductId = nil
+            creatorFilament = Filament(rawValue: UserDefaults.standard.string(forKey: "creator.filament") ?? "") ?? .bone
+        }
+    }
+
     func load() async {
         phase = .loading
         if let scenario {
+            if phase == .loading && products.isEmpty {
+                activeProductId = nil
+                creatorPrompt = Product.starter.prompt
+                creatorFilament = .bone
+            }
+            whopStore = WhopStoreRecord(name: "Demo store", accountId: "fixture")
+            whopStoreLoaded = true
             await loadFixtures(scenario)
             return
         }
@@ -48,6 +92,10 @@ final class MeltStore: ObservableObject {
         watch("profiles:me", with: mine) { [weak self] (record: ProfileRecord?) in
             self?.profile = record?.profile
         }
+        watch("whopData:myStore", with: mine) { [weak self] (record: WhopStoreRecord?) in
+            self?.whopStore = record
+            self?.whopStoreLoaded = true
+        }
         watch("duels:live") { [weak self] (records: [DuelRecord]) in
             self?.liveDuels = records.map(\.duel)
         }
@@ -56,6 +104,9 @@ final class MeltStore: ObservableObject {
         }
         watch("products:mine", with: mine) { [weak self] (records: [ProductRecord]) in
             self?.products = records.map { $0.product(creatorName: "You") }
+            if let id = self?.activeProductId, !records.contains(where: { $0._id == id }) {
+                self?.activeProductId = nil
+            }
         }
         watch("products:storefront") { [weak self] (records: [ProductRecord]) in
             self?.storefront = records.map { $0.product(creatorName: "Unknown") }
@@ -127,7 +178,7 @@ final class MeltStore: ObservableObject {
         do {
             return try await client.mutation(
                 "products:create",
-                with: ["deviceId": deviceId, "prompt": prompt, "filament": filament.rawValue]
+                with: ["deviceId": deviceId, "prompt": prompt, "filament": filament.rawValue, "generationQuality": generationQuality.rawValue]
             )
         } catch {
             throw MeltError(Self.message(for: error))
@@ -138,6 +189,7 @@ final class MeltStore: ObservableObject {
         if scenario != nil {
             if let index = products.firstIndex(where: { $0.id == productId }) {
                 products[index].filament = filament
+                products[index].colorCustomized = true
             }
             return
         }
@@ -151,67 +203,80 @@ final class MeltStore: ObservableObject {
         }
     }
 
-    func publish(productId: String, priceCents: Int) async throws {
+    func resetAppearance(productId: String) async throws {
+        guard let product = product(id: productId) else { throw MeltError("This design couldn't be found") }
         if scenario != nil {
-            guard let index = products.firstIndex(where: { $0.id == productId }) else { return }
+            if let index = products.firstIndex(where: { $0.id == productId }) { products[index].colorCustomized = false }
+            return
+        }
+        do {
+            try await client.mutation("products:setFilament", with: ["deviceId": deviceId, "productId": productId,
+                                                                  "filament": product.filament.rawValue, "useOriginal": true])
+        } catch { throw MeltError(Self.message(for: error)) }
+    }
+
+    func publish(productId: String, priceCents: Int) async throws -> URL? {
+        if scenario != nil {
+            guard let index = products.firstIndex(where: { $0.id == productId }) else { return nil }
             products[index].status = .published
             products[index].priceCents = priceCents
             storefront.insert(products[index], at: 0)
-            return
-        }
-        do {
-            try await client.mutation(
-                "products:publish",
-                with: ["deviceId": deviceId, "productId": productId, "priceCents": Double(priceCents)]
-            )
-        } catch {
-            throw MeltError(Self.message(for: error))
-        }
-    }
-
-    func checkout(productId: String) async throws -> URL? {
-        if scenario != nil {
-            guard let product = storefront.first(where: { $0.id == productId }) else { return nil }
-            orders.insert(
-                Order(
-                    id: "demo-\(UUID().uuidString)", productId: product.id, productName: product.name,
-                    buyerName: profile?.displayName ?? "You", creatorName: product.creatorName,
-                    filament: product.filament, amountCents: product.priceCents,
-                    status: .paid, fulfillment: .queued
-                ),
-                at: 0
-            )
             return nil
         }
         do {
-            let checkout: CheckoutRecord = try await client.action(
-                "whop:createCheckout", with: ["deviceId": deviceId, "productId": productId]
+            let result: WhopPublishRecord = try await client.action(
+                "whop:publishProduct",
+                with: ["deviceId": deviceId, "productId": productId, "priceCents": Double(priceCents)]
             )
-            return checkout.purchaseUrl.flatMap(URL.init(string:))
+            guard let url = URL(string: result.listingUrl) else { throw MeltError("Whop returned an invalid listing link") }
+            return url
         } catch {
             throw MeltError(Self.message(for: error))
         }
     }
 
-    func advanceFulfillment(orderId: String) async throws {
+    func saveStarter(filament: Filament) async throws -> String {
+        guard let profile else { throw MeltError("Connect to save your design") }
+        if let activeProductId { return activeProductId }
         if scenario != nil {
-            guard let index = sales.firstIndex(where: { $0.id == orderId }) else { return }
-            if sales[index].fulfillment == .queued {
-                sales[index].fulfillment = .submitted
-                sales[index].slantQuoteCents = 1_010
-                sales[index].slantOrderId = "draft:\(orderId)"
-            } else if sales[index].fulfillment == .submitted {
-                sales[index].fulfillment = .printing
-            }
-            return
+            var starter = Product.starter
+            starter = Product(id: "local-\(UUID().uuidString)", name: starter.name, prompt: starter.prompt,
+                              creatorId: profile.id, creatorName: profile.displayName, status: .ready,
+                              filament: filament, priceCents: starter.priceCents, salesCount: 0, starterKey: "friday-home", colorCustomized: creatorColorCustomized)
+            products.insert(starter, at: 0)
+            activeProductId = starter.id
+            return starter.id
         }
         do {
-            let _: String = try await client.mutation(
-                "orders:advanceFulfillment", with: ["deviceId": deviceId, "orderId": orderId]
-            )
-        } catch {
-            throw MeltError(Self.message(for: error))
+            let id: String = try await client.mutation("products:createStarter", with: ["deviceId": deviceId, "filament": filament.rawValue, "starterKey": "friday-home", "colorCustomized": creatorColorCustomized])
+            activeProductId = id
+            return id
+        } catch { throw MeltError(Self.message(for: error)) }
+    }
+
+    func edit(_ product: Product) {
+        activeProductId = product.id
+        creatorPrompt = product.prompt
+        creatorFilament = product.filament
+        selectedTab = .create
+    }
+
+    func checkout(productId: String) async throws -> CheckoutResult {
+        if scenario != nil {
+            guard let product = product(id: productId), let profile,
+                  product.status == .published || (product.status == .ready && product.creatorId == profile.id) else {
+                throw MeltError("This design isn't available to order")
+            }
+            let order = Order(id: "local-\(UUID().uuidString)", productId: product.id, productName: product.name,
+                              buyerName: profile.displayName, creatorName: product.creatorName,
+                              filament: product.filament, amountCents: product.priceCents, status: .paid, fulfillment: .queued)
+            orders.insert(order, at: 0)
+            return CheckoutResult(orderId: order.id, purchaseURL: nil)
         }
+        do {
+            let result: CheckoutRecord = try await client.action("whop:createCheckout", with: ["deviceId": deviceId, "productId": productId])
+            return CheckoutResult(orderId: result.orderId, purchaseURL: result.purchaseUrl.flatMap(URL.init(string:)))
+        } catch { throw MeltError(Self.message(for: error)) }
     }
 
     func connect(profileId: String) async throws {
@@ -272,7 +337,7 @@ final class MeltStore: ObservableObject {
             }
             Task { @MainActor in
                 try? await Task.sleep(for: .seconds(10))
-                once.resume(with: .failure(MeltError("Melt couldn't reach its backend. Check your connection and try again.")))
+                once.resume(with: .failure(MeltError("Friday couldn't reach its backend. Check your connection and try again.")))
             }
         }
     }
@@ -315,7 +380,7 @@ final class MeltStore: ObservableObject {
     private func loadFixtures(_ scenario: Fixtures.Scenario) async {
         try? await Task.sleep(for: .milliseconds(600))
         if scenario == .error {
-            phase = .failed("The Melt backend didn't answer. Check your connection and try again.")
+            phase = .failed("Check your connection and try again.")
             return
         }
         let world = scenario == .empty ? Fixtures.empty() : Fixtures.demo()

@@ -1,0 +1,104 @@
+{
+  "deployment": "dev:wry-skunk-692",
+  "requests": 6,
+  "automaticPaidRetries": 0,
+  "default": "detailed",
+  "reason": "Fast met the median speed threshold, but failed the functional-feature gate.",
+  "timingDefinition": "Seconds from products:create to previewReadyAt / generationFinishedAt; providerCompletedAt records completion observation, not the provider internal finish time.",
+  "jobs": [
+    {
+      "prompt": "A polka-dot man keychain: a small connected humanoid figure with raised circular polka dots, two arms, two legs, and an open attachment loop above its head. Flat back, rounded edges, solid printable shape.",
+      "name": "keychain",
+      "quality": "fast",
+      "productId": "jd7a310anq3499qk841qpwqth58jb2k3",
+      "endpoint": "meshy/t2/text-to-3d",
+      "status": "ready",
+      "previewSeconds": 100.434,
+      "readySeconds": 101.156,
+      "printSeconds": 0.691,
+      "loadsInRealityKit": true,
+      "qualityObservation": "Open rings and limbs are present; requested raised polka dots are absent. Extra chain rings appear separated from the head. Fails feature gate."
+    },
+    {
+      "prompt": "A polka-dot man keychain: a small connected humanoid figure with raised circular polka dots, two arms, two legs, and an open attachment loop above its head. Flat back, rounded edges, solid printable shape.",
+      "name": "keychain",
+      "quality": "detailed",
+      "productId": "jd7dr17jyqx4fvm87t2x9f4t9n8ja3tk",
+      "endpoint": "fal-ai/meshy/v7.1/text-to-3d",
+      "status": "ready",
+      "previewSeconds": 164.818,
+      "readySeconds": 165.557,
+      "printSeconds": 0.702,
+      "loadsInRealityKit": true,
+      "qualityObservation": "Open attachment rings and a humanoid silhouette are present; requested raised polka dots are absent."
+    },
+    {
+      "prompt": "A desktop phone stand with a wide stable base, an angled back support, and a raised front retaining lip to hold a phone upright. Open charging cable slot centered in the front lip. One connected solid printable object.",
+      "name": "phone-stand",
+      "quality": "fast",
+      "productId": "jd770kfcahmzqmptww5bd7sb358jbvk1",
+      "endpoint": "meshy/t2/text-to-3d",
+      "status": "ready",
+      "previewSeconds": 24.588,
+      "readySeconds": 25.257,
+      "printSeconds": 0.637,
+      "loadsInRealityKit": true,
+      "qualityObservation": "Base and angled support are present, but the output includes an unwanted phone-shaped object and does not show the requested centered cable opening in a retaining lip. Fails feature gate."
+    },
+    {
+      "prompt": "A desktop phone stand with a wide stable base, an angled back support, and a raised front retaining lip to hold a phone upright. Open charging cable slot centered in the front lip. One connected solid printable object.",
+      "name": "phone-stand",
+      "quality": "detailed",
+      "productId": "jd73an5tbk45cvd6qm9gj7h5kn8jbr1d",
+      "endpoint": "fal-ai/meshy/v7.1/text-to-3d",
+      "status": "ready",
+      "previewSeconds": 108.267,
+      "readySeconds": 108.676,
+      "printSeconds": 0.381,
+      "loadsInRealityKit": true,
+      "qualityObservation": "Base, angled support and retaining edges are visible. The requested centered front-lip cable slot is not clearly present."
+    },
+    {
+      "prompt": "A fox-shaped earbud holder: a seated fox with pointed ears and a curled tail forming a wide stable base, with a clearly open oval recess in its back to hold an earbud charging case. One connected solid printable object.",
+      "name": "fox-holder",
+      "quality": "fast",
+      "productId": "jd7c2vet2mhpz1mtej4626echx8jbxy2",
+      "endpoint": "meshy/t2/text-to-3d",
+      "status": "ready",
+      "previewSeconds": 28.529,
+      "readySeconds": 28.868,
+      "printSeconds": 0.309,
+      "loadsInRealityKit": true,
+      "qualityObservation": "Pointed ears, seated silhouette and tail are present. An earbud-case recess could not be confirmed from the inspected view; not certified as functional."
+    },
+    {
+      "prompt": "A fox-shaped earbud holder: a seated fox with pointed ears and a curled tail forming a wide stable base, with a clearly open oval recess in its back to hold an earbud charging case. One connected solid printable object.",
+      "name": "fox-holder",
+      "quality": "detailed",
+      "productId": "jd7f4teeeqam8kj1szzzb54cq98jaekn",
+      "endpoint": "fal-ai/meshy/v7.1/text-to-3d",
+      "status": "ready",
+      "previewSeconds": 48.746,
+      "readySeconds": 49.194,
+      "printSeconds": 0.411,
+      "loadsInRealityKit": true,
+      "qualityObservation": "Pointed ears, seated silhouette and curled tail are present. An earbud-case recess could not be confirmed from the inspected view; not certified as functional."
+    }
+  ],
+  "medianReadySeconds": {
+    "fast": 28.868,
+    "detailed": 108.676
+  },
+  "speedRatio": 3.764583622003603,
+  "validation": {
+    "backendTests": 42,
+    "iosDebugBuild": "passed",
+    "uiTestsRun": false,
+    "screenshotInspection": "All six benchmark outputs, local starter, existing tall fox and wide cup. Original generated assets unchanged.",
+    "materials": "All six outputs and inspected older assets had zero authored materials. Fixed RealityKit unbound-material error shader with neutral fallback. Separate authored checker-texture USDZ retained its texture.",
+    "reduceMotion": "Inspected static initial framing with the debug viewer Reduce Motion environment enabled.",
+    "touchInterruption": "Implemented; manual input validation blocked by Device Hub automation errors (noWindowsAvailable/frontmostApplicationChanged).",
+    "defaultGate": "Fast meets speed threshold but fails functional-feature requirement; Detailed retained.",
+    "generationValidationTests": 12
+  }
+}

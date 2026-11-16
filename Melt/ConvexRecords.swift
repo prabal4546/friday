@@ -29,6 +29,16 @@ struct ProductRecord: Decodable {
     let printNote: String?
     let failureReason: String?
     let usdzUrl: String?
+    let thumbnailUrl: String?
+    let starterKey: String?
+    let catalogKey: String?
+    let colorCustomized: Bool?
+    let whopListingUrl: String?
+    @OptionalConvexFloat var whopPublishPriceCents: Double?
+    let generationQuality: String?
+    let generationStage: String?
+    @OptionalConvexFloat var generationRequestedAt: Double?
+    @OptionalConvexFloat var generationFinishedAt: Double?
 
     func product(creatorName fallback: String) -> Product {
         Product(
@@ -38,7 +48,14 @@ struct ProductRecord: Decodable {
             filament: Filament(rawValue: filament) ?? .bone,
             priceCents: Int(priceCents), salesCount: Int(salesCount),
             printNote: printNote, failureReason: failureReason,
-            usdzURL: usdzUrl.flatMap(URL.init(string:))
+            usdzURL: usdzUrl.flatMap(URL.init(string:)),
+            thumbnailURL: thumbnailUrl.flatMap(URL.init(string:)), starterKey: starterKey, catalogKey: catalogKey, colorCustomized: colorCustomized,
+            generationQuality: generationQuality.flatMap(GenerationQuality.init(rawValue:)),
+            generationStage: generationStage.flatMap(GenerationStage.init(rawValue:)),
+            generationRequestedAt: generationRequestedAt.map { Date(timeIntervalSince1970: $0 / 1000) },
+            generationFinishedAt: generationFinishedAt.map { Date(timeIntervalSince1970: $0 / 1000) },
+            whopListingURL: whopListingUrl.flatMap(URL.init(string:)),
+            whopPublishPriceCents: whopPublishPriceCents.map(Int.init)
         )
     }
 }
@@ -124,4 +141,13 @@ struct FriendRecord: Decodable {
             products: products.map { $0.product(creatorName: displayName) }
         )
     }
+}
+
+struct WhopStoreRecord: Decodable {
+    let name: String
+    let accountId: String
+}
+
+struct WhopPublishRecord: Decodable {
+    let listingUrl: String
 }
