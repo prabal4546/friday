@@ -137,7 +137,27 @@ struct ModelPreview: View {
                 description: Text(product.failureReason ?? "Generation failed")
             )
         case .ready, .published:
+            #if targetEnvironment(simulator)
+            VStack(spacing: 12) {
+                if let thumbnail = product.thumbnailURL {
+                    AsyncImage(url: thumbnail) { image in
+                        image.resizable().scaledToFit()
+                    } placeholder: {
+                        Image(systemName: "cube.transparent").font(.largeTitle)
+                    }
+                } else {
+                    Image(systemName: "cube.transparent").font(.largeTitle)
+                }
+                Text("3D preview unavailable in this simulator. Open on an iPhone to rotate the model.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+            .padding()
+            .frame(maxWidth: .infinity)
+            #else
             ModelStage(product: product)
+            #endif
         }
     }
 }
