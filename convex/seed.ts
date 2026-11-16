@@ -1,3 +1,5 @@
+import { ConvexError, v } from "convex/values";
+import { CATALOG, catalogKey } from "./lib/catalog";
 import { internal } from "./_generated/api";
 import type { Id } from "./_generated/dataModel";
 import { internalMutation, type MutationCtx } from "./_generated/server";
@@ -17,6 +19,12 @@ async function seedWorld(ctx: MutationCtx) {
     const wen = await profile("seed:wen", "Wen Liu", 1, 22890);
     const aoife = await profile("seed:aoife", "Aoife Byrne", 0, 0);
     const kwame = await profile("seed:kwame", "Kwame Mensah", 0, 0);
+    const friendship = async (left: Id<"profiles">, right: Id<"profiles">) => {
+      const [profileAId, profileBId] = left < right ? [left, right] : [right, left];
+      await ctx.db.insert("friendships", { profileAId, profileBId });
+    };
+    await friendship(you, priya);
+    await friendship(you, tomas);
 
     const published = (
       creatorId: Id<"profiles">,
@@ -26,6 +34,7 @@ async function seedWorld(ctx: MutationCtx) {
       priceCents: number,
       printCostCents: number,
       salesCount: number,
+      catalogKey: keyof typeof CATALOG,
     ) =>
       ctx.db.insert("products", {
         creatorId,
@@ -37,9 +46,10 @@ async function seedWorld(ctx: MutationCtx) {
         printCostCents,
         printability: "ok",
         salesCount,
+        catalogKey,
       });
 
-    const vase = await published(you, "Twisted hex vase", "A hexagonal vase with a slow twist", "sky", 2200, 790, 31);
+    const vase = await published(you, "Twisted hex vase", "A hexagonal vase with a slow twist", "sky", 2200, 790, 31, "twisted-hex-vase");
     await ctx.db.insert("products", {
       creatorId: you,
       name: "Mushroom lamp shade",
@@ -63,7 +73,7 @@ async function seedWorld(ctx: MutationCtx) {
       failureReason: "The model service timed out",
       salesCount: 0,
     });
-    const capybara = await published(you, "Sleepy capybara planter", "A desk planter shaped like a sleepy capybara", "caramel", 1800, 640, 14);
+    const capybara = await published(you, "Sleepy capybara planter", "A desk planter shaped like a sleepy capybara", "caramel", 1800, 640, 14, "capybara-planter");
     await ctx.db.insert("products", {
       creatorId: you,
       name: "Rocket pen cup",
@@ -85,11 +95,11 @@ async function seedWorld(ctx: MutationCtx) {
       printability: "pending",
       salesCount: 0,
     });
-    const ghost = await published(priya, "Ghost night light", "A ghost night light with a wavy hem", "bone", 1400, 490, 30);
-    const fox = await published(tomas, "Fox desk buddy", "A fox that holds my earbuds", "tangerine", 1500, 560, 30);
-    const duck = await published(wen, "Duck in a top hat", "A duck in a top hat for my desk", "sunflower", 1700, 610, 21);
-    const bins = await published(kwame, "Stackable hex bins", "Two hexagonal bins that stack", "matcha", 900, 310, 0);
-    const egg = await published(aoife, "Egg cup", "An egg cup with a wide foot", "sky", 1100, 380, 0);
+    const ghost = await published(priya, "Ghost night light", "A ghost night light with a wavy hem", "bone", 1400, 490, 30, "ghost-night-light");
+    const fox = await published(tomas, "Fox desk buddy", "A fox that holds my earbuds", "tangerine", 1500, 560, 30, "fox-desk-buddy");
+    const duck = await published(wen, "Duck in a top hat", "A duck in a top hat for my desk", "sunflower", 1700, 610, 21, "top-hat-duck");
+    const bins = await published(kwame, "Stackable hex bins", "Two hexagonal bins that stack", "matcha", 900, 310, 0, "hex-bins");
+    const egg = await published(aoife, "Egg cup", "An egg cup with a wide foot", "sky", 1100, 380, 0, "egg-cup");
 
     const liveDuel = async (
       productAId: Id<"products">,
@@ -150,6 +160,17 @@ async function seedWorld(ctx: MutationCtx) {
       whopPaymentId: "seed:pay_1042",
       paidAt: now - 20 * HOUR,
     });
+    await ctx.db.insert("orders", {
+      productId: vase,
+      buyerId: priya,
+      creatorId: you,
+      filament: "sky",
+      amountCents: 2200,
+      status: "paid",
+      fulfillment: "queued",
+      whopPaymentId: "seed:pay_creator_1",
+      paidAt: now - 2 * HOUR,
+    });
 }
 
 export const run = internalMutation({
@@ -164,10 +185,39 @@ export const run = internalMutation({
 export const reset = internalMutation({
   args: {},
   handler: async (ctx) => {
-    for (const table of ["transactions", "orders", "stakes", "duels", "products", "profiles"] as const) {
+    for (const table of ["transactions", "orders", "stakes", "duels", "friendships", "products", "profiles"] as const) {
       for (const doc of await ctx.db.query(table).take(1000)) await ctx.db.delete(doc._id);
     }
     await seedWorld(ctx);
     return "reset";
+  },
+});
+
+// Repairs only explicitly reviewed legacy records. Never reseed a populated world.
+export const repairCatalog = internalMutation({
+  args: { products: v.array(v.object({ productId: v.id("products"), catalogKey })) },
+  returns: v.object({ updated: v.number(), skipped: v.number() }),
+  handler: async (ctx, { products }) => {
+    if (products.length > 7 || new Set(products.map(p => p.productId)).size !== products.length) {
+      throw new ConvexError("Provide at most seven distinct catalog products");
+    }
+    let updated = 0;
+    let skipped = 0;
+    for (const { productId, catalogKey } of products) {
+      const product = await ctx.db.get(productId);
+      const expected = CATALOG[catalogKey];
+      if (!product || product.name !== expected.name || product.prompt !== expected.prompt ||
+          (product.status !== "ready" && product.status !== "published")) {
+        throw new ConvexError("Product does not match the expected catalog entry");
+      }
+      if (product.usdzUrl !== undefined || product.thumbnailUrl !== undefined || product.stlUrl !== undefined ||
+          product.starterKey !== undefined || product.catalogKey !== undefined) {
+        skipped++;
+        continue;
+      }
+      await ctx.db.patch(productId, { catalogKey });
+      updated++;
+    }
+    return { updated, skipped };
   },
 });

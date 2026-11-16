@@ -1,6 +1,6 @@
 # Hackathon log
 
-- **Project:** Melt
+- **Project:** Friday
 - **Event:** Consumer Mobile Hackathon
 - **What it does:** Native SwiftUI iOS app where creators describe a 3D-printable product, sell it through Whop, and duel other creators on sales while everyone else stakes demo credits on the winner.
 - **Live app:** not deployed
@@ -12,7 +12,7 @@
 - **Auth:** none
 - **AI models:** fal-ai/meshy/v7.1/text-to-3d (called through fal)
 - **Started:** 2026-11-15T22:06:44Z
-- **Last updated:** 2026-11-15T23:18:29Z
+- **Last updated:** 2026-11-15T23:48:30Z
 
 ## Log
 
@@ -59,3 +59,21 @@ saves the choice. Convex features: actions, HTTP actions, scheduled functions,
 file storage, mutations (`convex/generation.ts`, `convex/lib/stl.ts`,
 `convex/http.ts`, `convex/products.ts`, `Melt/ProductDetailView.swift`,
 `Melt/FilamentPicker.swift`).
+
+### 2026-11-15 - working tree
+Added a live creator storefront and the two-device commerce loop. A creator can
+publish a ready design; another device can open it from Arena and create a one-time
+Whop sandbox checkout. The signed payment webhook applies a sale idempotently,
+increments the duel, and updates creator earnings. Without a Whop key, checkout
+uses an explicit demo payment so the judge flow stays runnable. Orders subscribe
+on both sides, and creators can move a sale through Paid, Submitted, and Printing;
+Submitted records a local Slant quote and draft ID without calling production.
+The complete no-key flow was exercised on the dev deployment with separate
+seller and buyer device IDs. Convex features: queries, mutations, actions, HTTP
+actions, realtime queries (`convex/products.ts`, `convex/orders.ts`,
+`convex/whop.ts`, `convex/http.ts`, `Melt/StorefrontView.swift`,
+`Melt/LibraryView.swift`). Added instant mutual creator connections and a
+new-duel form that pairs published products only after their creators connect.
+The resulting 24-hour duel streams to both devices, accepts demo-credit backing,
+and gains sales when either product is purchased (`convex/friends.ts`,
+`convex/duels.ts`, `Melt/ArenaView.swift`).

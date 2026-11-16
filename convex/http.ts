@@ -9,7 +9,10 @@ http.route({
   path: "/webhooks/whop",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const secret = process.env.WHOP_WEBHOOK_SECRET;
+    const accountParam = new URL(request.url).searchParams.get("account");
+    const store = accountParam ? await ctx.runQuery(internal.whopData.storeForAccount, { accountId: accountParam }) : null;
+    if (accountParam && !store) return new Response("Unknown store", { status: 404 });
+    const secret = process.env[store?.webhookSecretEnv ?? "WHOP_WEBHOOK_SECRET"];
     if (secret === undefined) {
       return new Response("WHOP_WEBHOOK_SECRET is not set on this deployment", { status: 503 });
     }
@@ -24,13 +27,30 @@ http.route({
     });
     if (!verified) return new Response("Invalid webhook signature", { status: 401 });
 
-    const event = JSON.parse(body);
-    if (event.type === "payment.succeeded") {
-      const metadata = event.data.metadata ?? {};
+    let event: unknown;
+    try {
+      event = JSON.parse(body);
+    } catch {
+      return new Response("Expected a JSON body", { status: 400 });
+    }
+    const root = typeof event === "object" && event !== null ? (event as Record<string, unknown>) : null;
+    const data =
+      typeof root?.data === "object" && root.data !== null ? (root.data as Record<string, unknown>) : null;
+    if (root?.type === "payment.succeeded") {
+      if (typeof data?.id !== "string") return new Response("Missing payment id", { status: 400 });
+      const metadata =
+        typeof data.metadata === "object" && data.metadata !== null
+          ? (data.metadata as Record<string, unknown>)
+          : {};
+      const account = typeof data.account === "object" && data.account !== null ? data.account as Record<string, unknown> : {};
+      const accountId = typeof data.account_id === "string" ? data.account_id : typeof account.id === "string" ? account.id : undefined;
+      if (accountParam && accountId !== accountParam) return new Response("Payment account mismatch", { status: 400 });
       await ctx.runMutation(internal.orders.markPaid, {
-        whopPaymentId: event.data.id,
+        whopPaymentId: data.id,
+        accountId,
         orderId: typeof metadata.orderId === "string" ? metadata.orderId : undefined,
-        whopCheckoutId: event.data.checkout_configuration_id ?? undefined,
+        whopCheckoutId:
+          typeof data.checkout_configuration_id === "string" ? data.checkout_configuration_id : undefined,
       });
     }
     return new Response(null, { status: 200 });

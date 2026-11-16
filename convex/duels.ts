@@ -4,6 +4,7 @@ import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, mutation, query, type QueryCtx } from "./_generated/server";
 import { productSummary } from "./products";
 import { requireProfile } from "./profiles";
+import { areFriends } from "./friends";
 
 export const DUEL_MS = 24 * 60 * 60 * 1000;
 
@@ -78,6 +79,9 @@ export const challenge = mutation({
     }
     if (theirs === null || theirs.creatorId === profile._id) {
       throw new ConvexError("Pick a product from another creator");
+    }
+    if (!(await areFriends(ctx, profile._id, theirs.creatorId))) {
+      throw new ConvexError("Connect with this creator before starting a duel");
     }
     if (mine.status !== "published" || theirs.status !== "published") {
       throw new ConvexError("Both products must be published");

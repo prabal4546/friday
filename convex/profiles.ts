@@ -54,3 +54,15 @@ export const me = query({
   args: { deviceId: v.string() },
   handler: async (ctx, args) => await profileByDevice(ctx, args.deviceId),
 });
+
+export const rename = mutation({
+  args: { deviceId: v.string(), displayName: v.string() },
+  handler: async (ctx, args) => {
+    const profile = await requireProfile(ctx, args.deviceId);
+    const displayName = args.displayName.trim();
+    if (displayName.length < 1 || displayName.length > 24) {
+      throw new ConvexError("Use a name from 1 to 24 characters");
+    }
+    await ctx.db.patch(profile._id, { displayName });
+  },
+});

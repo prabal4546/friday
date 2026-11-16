@@ -7,6 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+        F11DA7000000000000000004 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = F11DA7000000000000000005 /* Assets.xcassets */; };
+        F11DA7000000000000000001 /* FridayHome.usdz in Resources */ = {isa = PBXBuildFile; fileRef = F11DA7000000000000000002 /* FridayHome.usdz */; };
+		CA7A10000000000000000001 /* CatalogModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10000000000000000002 /* CatalogModel.swift */; };
 		137C2779386A32173AF194F1 /* LibraryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA1941ADF761A16481052445 /* LibraryView.swift */; };
 		20957F7A5901556AFC760F9F /* Fixtures.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD46521C0D1A27CD4DA1F91 /* Fixtures.swift */; };
 		226AFEC4A282EF49AC1F3DE7 /* Models.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E6A2276BC304C7B28A3DD62 /* Models.swift */; };
@@ -15,12 +18,15 @@
 		2B86DEF175E87F90588DEF9E /* ConvexRecords.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1EA925B89A97628C1EFCFDB /* ConvexRecords.swift */; };
 		3F673720448290D6AD321F9D /* FilamentPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55364E91CC6D4EFD41397DA7 /* FilamentPicker.swift */; };
 		437826DFB9FD2BE262706D3B /* ArenaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2BE8D425F8DF7007D05184D9 /* ArenaView.swift */; };
+		471F88B2ECE77DFF7B99DF7B /* StorefrontView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 44D7FAA98D8DB044EA49249E /* StorefrontView.swift */; };
 		587F64517C5CCE1079D487A6 /* CreateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 156F6F6EA9813C15ED3B0B00 /* CreateView.swift */; };
 		5EB18A7B8F90CCD8A0BCF75D /* ConvexMobile in Frameworks */ = {isa = PBXBuildFile; productRef = 7C52DCC61AF940D65093FCE4 /* ConvexMobile */; };
 		7EFFD8352EA2031E0D025356 /* MeltStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C22A020C73AD248C0932B07A /* MeltStore.swift */; };
+		8A0AC1C2B0F30A93BC321689 /* DesignSystem.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8EA13DBF26DA8BDD081CB051 /* DesignSystem.swift */; };
 		B808CB7A4F19D651C8F9A89F /* ProductDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1847A78148925F86A4C9BF74 /* ProductDetailView.swift */; };
 		D45D98ADAF6DFAEB8B6AFB57 /* DeviceIdentity.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB74C4DD360B5F3EB5A80FDF /* DeviceIdentity.swift */; };
 		DFEB9EAAE8537675CBB82BBF /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D99AD63BFB3B88A989558BCD /* RootView.swift */; };
+		F0F1E8165CADB13CEA3BF55E /* ModelPreview.swift in Sources */ = {isa = PBXBuildFile; fileRef = FE7DF14C0238B4435364BE6F /* ModelPreview.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -34,23 +40,29 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+        F11DA7000000000000000005 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+        F11DA7000000000000000002 /* FridayHome.usdz */ = {isa = PBXFileReference; lastKnownFileType = file; path = Resources/FridayHome.usdz; sourceTree = "<group>"; };
+		CA7A10000000000000000002 /* CatalogModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogModel.swift; sourceTree = "<group>"; };
 		0AD46521C0D1A27CD4DA1F91 /* Fixtures.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Fixtures.swift; sourceTree = "<group>"; };
-		1499B8CFB326FC098BE73939 /* MeltUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MeltUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		1499B8CFB326FC098BE73939 /* MeltUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MeltUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		156F6F6EA9813C15ED3B0B00 /* CreateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CreateView.swift; sourceTree = "<group>"; };
 		1847A78148925F86A4C9BF74 /* ProductDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProductDetailView.swift; sourceTree = "<group>"; };
 		2BE8D425F8DF7007D05184D9 /* ArenaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ArenaView.swift; sourceTree = "<group>"; };
 		3E6A2276BC304C7B28A3DD62 /* Models.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Models.swift; sourceTree = "<group>"; };
 		3EC438FBE65AF88B8AFFB195 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		44D7FAA98D8DB044EA49249E /* StorefrontView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StorefrontView.swift; sourceTree = "<group>"; };
 		55364E91CC6D4EFD41397DA7 /* FilamentPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilamentPicker.swift; sourceTree = "<group>"; };
 		61B8D9D4E78462E245C871FB /* MeltUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeltUITests.swift; sourceTree = "<group>"; };
+		8EA13DBF26DA8BDD081CB051 /* DesignSystem.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystem.swift; sourceTree = "<group>"; };
 		C1EA925B89A97628C1EFCFDB /* ConvexRecords.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ConvexRecords.swift; sourceTree = "<group>"; };
 		C22A020C73AD248C0932B07A /* MeltStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeltStore.swift; sourceTree = "<group>"; };
 		CA1941ADF761A16481052445 /* LibraryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LibraryView.swift; sourceTree = "<group>"; };
 		CD32D1B246A458E06EF96E16 /* MeltApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MeltApp.swift; sourceTree = "<group>"; };
 		D7A88A192A5962143A1F3A6C /* Melt.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Melt.xcconfig; sourceTree = "<group>"; };
 		D99AD63BFB3B88A989558BCD /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
-		EAB596305C41B7598B889E95 /* Melt.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Melt.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		EAB596305C41B7598B889E95 /* Melt.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Melt.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		FB74C4DD360B5F3EB5A80FDF /* DeviceIdentity.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeviceIdentity.swift; sourceTree = "<group>"; };
+		FE7DF14C0238B4435364BE6F /* ModelPreview.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ModelPreview.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,9 +80,12 @@
 		13C3A2C04FCE37CD63301707 /* Melt */ = {
 			isa = PBXGroup;
 			children = (
+                F11DA7000000000000000002 /* FridayHome.usdz */,
+                F11DA7000000000000000005 /* Assets.xcassets */,
 				2BE8D425F8DF7007D05184D9 /* ArenaView.swift */,
 				C1EA925B89A97628C1EFCFDB /* ConvexRecords.swift */,
 				156F6F6EA9813C15ED3B0B00 /* CreateView.swift */,
+				8EA13DBF26DA8BDD081CB051 /* DesignSystem.swift */,
 				FB74C4DD360B5F3EB5A80FDF /* DeviceIdentity.swift */,
 				55364E91CC6D4EFD41397DA7 /* FilamentPicker.swift */,
 				0AD46521C0D1A27CD4DA1F91 /* Fixtures.swift */,
@@ -78,9 +93,12 @@
 				CA1941ADF761A16481052445 /* LibraryView.swift */,
 				CD32D1B246A458E06EF96E16 /* MeltApp.swift */,
 				C22A020C73AD248C0932B07A /* MeltStore.swift */,
+				FE7DF14C0238B4435364BE6F /* ModelPreview.swift */,
+				CA7A10000000000000000002 /* CatalogModel.swift */,
 				3E6A2276BC304C7B28A3DD62 /* Models.swift */,
 				1847A78148925F86A4C9BF74 /* ProductDetailView.swift */,
 				D99AD63BFB3B88A989558BCD /* RootView.swift */,
+				44D7FAA98D8DB044EA49249E /* StorefrontView.swift */,
 			);
 			path = Melt;
 			sourceTree = "<group>";
@@ -147,6 +165,7 @@
 			buildPhases = (
 				35214CCA69C99E423D733E37 /* Sources */,
 				F4424302E9E323B197C2062D /* Frameworks */,
+                F11DA7000000000000000003 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -161,6 +180,15 @@
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
+
+/* Begin PBXResourcesBuildPhase section */
+        F11DA7000000000000000003 /* Resources */ = {
+            isa = PBXResourcesBuildPhase;
+            buildActionMask = 2147483647;
+            files = (F11DA7000000000000000001 /* FridayHome.usdz in Resources */, F11DA7000000000000000004 /* Assets.xcassets in Resources */,);
+            runOnlyForDeploymentPostprocessing = 0;
+        };
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXProject section */
 		F0C9B96321D18957D83DCCCC /* Project object */ = {
@@ -205,15 +233,19 @@
 				437826DFB9FD2BE262706D3B /* ArenaView.swift in Sources */,
 				2B86DEF175E87F90588DEF9E /* ConvexRecords.swift in Sources */,
 				587F64517C5CCE1079D487A6 /* CreateView.swift in Sources */,
+				8A0AC1C2B0F30A93BC321689 /* DesignSystem.swift in Sources */,
 				D45D98ADAF6DFAEB8B6AFB57 /* DeviceIdentity.swift in Sources */,
 				3F673720448290D6AD321F9D /* FilamentPicker.swift in Sources */,
 				20957F7A5901556AFC760F9F /* Fixtures.swift in Sources */,
 				137C2779386A32173AF194F1 /* LibraryView.swift in Sources */,
 				2339A8E688E7EF215BAC01FE /* MeltApp.swift in Sources */,
 				7EFFD8352EA2031E0D025356 /* MeltStore.swift in Sources */,
+				F0F1E8165CADB13CEA3BF55E /* ModelPreview.swift in Sources */,
+				CA7A10000000000000000001 /* CatalogModel.swift in Sources */,
 				226AFEC4A282EF49AC1F3DE7 /* Models.swift in Sources */,
 				B808CB7A4F19D651C8F9A89F /* ProductDetailView.swift in Sources */,
 				DFEB9EAAE8537675CBB82BBF /* RootView.swift in Sources */,
+				471F88B2ECE77DFF7B99DF7B /* StorefrontView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -242,6 +274,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = U23VWM3L5A;
 				INFOPLIST_FILE = Melt/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -335,6 +368,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = U23VWM3L5A;
 				INFOPLIST_FILE = Melt/Info.plist;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

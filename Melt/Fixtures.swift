@@ -8,9 +8,13 @@ enum Fixtures {
     struct World {
         var profile: Profile
         var products: [Product] = []
+        var storefront: [Product] = []
         var liveDuels: [Duel] = []
         var settledDuels: [Duel] = []
         var stakes: [Stake] = []
+        var friends: [Friend] = []
+        var orders: [Order] = []
+        var sales: [Order] = []
     }
 
     static func empty() -> World {
@@ -20,11 +24,11 @@ enum Fixtures {
     static func demo(now: Date = .now) -> World {
         func published(
             _ id: String, _ name: String, _ prompt: String, by creator: String,
-            _ filament: Filament, _ priceCents: Int, sold: Int
+            _ filament: Filament, _ priceCents: Int, sold: Int, catalogKey: String
         ) -> Product {
             Product(
                 id: id, name: name, prompt: prompt, creatorId: creator, creatorName: creator,
-                status: .published, filament: filament, priceCents: priceCents, salesCount: sold
+                status: .published, filament: filament, priceCents: priceCents, salesCount: sold, catalogKey: catalogKey
             )
         }
         func draft(
@@ -38,13 +42,13 @@ enum Fixtures {
             )
         }
 
-        let vase = published("vase", "Twisted hex vase", "A hexagonal vase with a slow twist", by: "You", .sky, 2200, sold: 31)
-        let capybara = published("capybara", "Sleepy capybara planter", "A desk planter shaped like a sleepy capybara", by: "You", .caramel, 1800, sold: 14)
-        let ghost = published("ghost", "Ghost night light", "A ghost night light with a wavy hem", by: "Priya Raman", .bone, 1400, sold: 30)
-        let fox = published("fox", "Fox desk buddy", "A fox that holds my earbuds", by: "Tomás Herrera", .tangerine, 1500, sold: 30)
-        let duck = published("duck", "Duck in a top hat", "A duck in a top hat for my desk", by: "Wen Liu", .sunflower, 1700, sold: 21)
-        let bins = published("bins", "Stackable hex bins", "Two hexagonal bins that stack", by: "Kwame Mensah", .matcha, 900, sold: 0)
-        let egg = published("egg", "Egg cup", "An egg cup with a wide foot", by: "Aoife Byrne", .sky, 1100, sold: 0)
+        let vase = published("vase", "Twisted hex vase", "A hexagonal vase with a slow twist", by: "You", .sky, 2200, sold: 31, catalogKey: "twisted-hex-vase")
+        let capybara = published("capybara", "Sleepy capybara planter", "A desk planter shaped like a sleepy capybara", by: "You", .caramel, 1800, sold: 14, catalogKey: "capybara-planter")
+        let ghost = published("ghost", "Ghost night light", "A ghost night light with a wavy hem", by: "Priya Raman", .bone, 1400, sold: 30, catalogKey: "ghost-night-light")
+        let fox = published("fox", "Fox desk buddy", "A fox that holds my earbuds", by: "Tomás Herrera", .tangerine, 1500, sold: 30, catalogKey: "fox-desk-buddy")
+        let duck = published("duck", "Duck in a top hat", "A duck in a top hat for my desk", by: "Wen Liu", .sunflower, 1700, sold: 21, catalogKey: "top-hat-duck")
+        let bins = published("bins", "Stackable hex bins", "Two hexagonal bins that stack", by: "Kwame Mensah", .matcha, 900, sold: 0, catalogKey: "hex-bins")
+        let egg = published("egg", "Egg cup", "An egg cup with a wide foot", by: "Aoife Byrne", .sky, 1100, sold: 0, catalogKey: "egg-cup")
 
         func duel(
             _ id: String, _ a: Product, _ b: Product, hours: Double, live: Bool,
@@ -79,6 +83,7 @@ enum Fixtures {
                 ),
                 vase,
             ],
+            storefront: [ghost, fox, duck, bins, egg, capybara, vase],
             liveDuels: [
                 duel("live-1", capybara, ghost, hours: 5.69, live: true, sales: (14, 11), pools: (3200, 2450)),
                 duel("live-2", fox, duck, hours: 11.09, live: true, sales: (8, 9), pools: (1100, 1900)),
@@ -91,6 +96,24 @@ enum Fixtures {
             stakes: [
                 Stake(duelId: "settled-1", side: .a, amount: 200, payout: 340),
                 Stake(duelId: "settled-2", side: .a, amount: 100, payout: 0),
+            ],
+            friends: [
+                Friend(id: "Priya Raman", displayName: "Priya Raman", products: [ghost]),
+                Friend(id: "Tomás Herrera", displayName: "Tomás Herrera", products: [fox]),
+            ],
+            orders: [
+                Order(
+                    id: "order-bought", productId: ghost.id, productName: ghost.name,
+                    buyerName: "You", creatorName: ghost.creatorName, filament: ghost.filament,
+                    amountCents: ghost.priceCents, status: .paid, fulfillment: .printing
+                )
+            ],
+            sales: [
+                Order(
+                    id: "order-sale", productId: vase.id, productName: vase.name,
+                    buyerName: "Priya Raman", creatorName: "You", filament: vase.filament,
+                    amountCents: vase.priceCents, status: .paid, fulfillment: .queued
+                )
             ]
         )
     }
