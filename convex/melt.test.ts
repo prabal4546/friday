@@ -131,6 +131,20 @@ test("checkout carries productId, creatorId, and orderId, and a signed payment i
   expect(duel.productA.salesCount).toBe(fox.salesCount + 1);
 });
 
+test("production Whop checkout remains disabled", async () => {
+  const { t, foxVsDuck } = await seeded();
+  vi.stubEnv("WHOP_API_KEY", "test-key");
+  vi.stubEnv("WHOP_ENVIRONMENT", "production");
+  const fetchMock = vi.fn();
+  vi.stubGlobal("fetch", fetchMock);
+
+  await expect(
+    t.action(api.whop.createCheckout, { deviceId: "phone-2", productId: foxVsDuck.productA._id }),
+  ).rejects.toThrow("Production Whop checkout is disabled");
+  expect(fetchMock).not.toHaveBeenCalled();
+  expect(await t.query(api.orders.mine, { deviceId: "phone-2" })).toEqual([]);
+});
+
 test("publish, demo checkout, creator earnings, and draft fulfillment work without external keys", async () => {
   const { t, foxVsDuck } = await seeded();
   const rocket = (await t.query(api.products.mine, { deviceId: "phone-1" })).find(

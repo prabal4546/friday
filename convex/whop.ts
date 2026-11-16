@@ -16,10 +16,10 @@ export const createCheckout = action({
       const orderId = await ctx.runMutation(internal.orders.createDemoPaid, args);
       return { orderId, purchaseUrl: null, demo: true };
     }
-    const baseUrl =
-      process.env.WHOP_ENVIRONMENT === "production"
-        ? "https://api.whop.com/api/v1"
-        : "https://sandbox-api.whop.com/api/v1";
+    if (process.env.WHOP_ENVIRONMENT === "production") {
+      throw new ConvexError("Production Whop checkout is disabled for this demo");
+    }
+    const baseUrl = "https://sandbox-api.whop.com/api/v1";
 
     const order = await ctx.runMutation(internal.orders.createPending, args);
     const response = await fetch(`${baseUrl}/checkout_configurations`, {
